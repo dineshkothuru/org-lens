@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Org Lens for Salesforce",
+  "version": "1.58.1",
+  "description": "Inspect and export Salesforce org metadata: schema, permissions, automation, health. Uses your current Salesforce session; nothing is stored or sent anywhere.",
+  "permissions": ["cookies", "storage", "tabs"],
+  "host_permissions": [
+    "https://*.salesforce.com/*",
+    "https://*.force.com/*",
+    "https://*.salesforce-setup.com/*",
+    "https://*.cloudforce.com/*",
+    "https://*.database.com/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_title": "Open Org Lens" },
+  "icons": { "16": "icons/16.png", "48": "icons/48.png", "128": "icons/128.png" }
+}

@@ -1,0 +1,1940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Org Lens</title>
+<script src="xlsx.full.min.js"></script>
+<script src="elk.bundled.js"></script>
+<style>
+  :root {
+    --bg: #0b1526;
+    --panel: #ffffff;
+    --ink: #10182b;
+    --muted: #5b6b83;
+    --faint: #8b98ad;
+    --brand: #0176d3;
+    --brand-2: #1b96ff;
+    --brand-dark: #014486;
+    --ok: #2e844a;
+    --warn: #b8621b;
+    --err: #ba0517;
+    --border: #e5eaf1;
+    --field-bg: #f7f9fc;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { min-height: 100vh; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background:
+      radial-gradient(1000px 500px at 85% -10%, rgba(27,150,255,.28), transparent 60%),
+      radial-gradient(800px 500px at -10% 110%, rgba(1,118,211,.22), transparent 55%),
+      var(--bg);
+    color: var(--ink);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 36px clamp(16px, 2.5vw, 44px) 40px;
+  }
+
+  /* ---------- landing hero ---------- */
+  #landing { width: 100%; max-width: 1040px; }
+  .landgrid {
+    display: grid; grid-template-columns: 1.15fr .85fr; gap: 56px;
+    align-items: center; min-height: 68vh;
+  }
+  .hero { text-align: left; max-width: 560px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: rgba(27,150,255,.14); border: 1px solid rgba(27,150,255,.35);
+    color: #9ecff7; font-size: 12px; font-weight: 600; letter-spacing: .04em;
+    padding: 6px 14px; border-radius: 999px; margin-bottom: 18px;
+    text-transform: uppercase;
+  }
+  .badge svg { width: 14px; height: 14px; }
+  .hero h1 { color: #fff; font-size: 34px; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; }
+  .hero h1 span {
+    background: linear-gradient(90deg, #4db1ff, #9ecff7);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero p { color: #a7b4c9; font-size: 15.5px; margin-top: 12px; line-height: 1.6; }
+  .trust {
+    display: flex; gap: 22px; justify-content: flex-start; margin-top: 20px;
+    color: #7e8ca3; font-size: 12.5px; font-weight: 500; flex-wrap: wrap;
+  }
+  .trust span { display: inline-flex; align-items: center; gap: 6px; }
+  .trust svg { width: 14px; height: 14px; color: #4db1ff; }
+
+  .card {
+    background: var(--panel); border-radius: 18px; width: 100%; max-width: 520px;
+    padding: 34px 36px 28px;
+    box-shadow: 0 24px 60px -18px rgba(2,12,30,.55), 0 2px 8px rgba(2,12,30,.25);
+  }
+
+  label { display: block; font-size: 13px; font-weight: 600; margin: 16px 0 6px; color: var(--ink); }
+  .hint { font-weight: 400; color: var(--faint); font-size: 12px; }
+  input[type=text], input[type=search], input[type=date], select {
+    width: 100%; padding: 11px 14px; border: 1.5px solid var(--border); border-radius: 10px;
+    font-size: 14px; font-family: inherit; background: var(--field-bg); color: var(--ink);
+    transition: border-color .15s, background .15s, box-shadow .15s;
+  }
+  input[type=text]:focus, input[type=search]:focus, input[type=date]:focus, select:focus {
+    outline: none; border-color: var(--brand); background: #fff;
+    box-shadow: 0 0 0 3px rgba(1,118,211,.15);
+  }
+  input.searchbox {
+    background-color: #fff; border-radius: 999px; padding-left: 40px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='%235b6b83' stroke-width='2.4'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: 15px center;
+    box-shadow: 0 1px 3px rgba(2,12,30,.08);
+  }
+  input.searchbox::placeholder { color: #93a1b5; }
+  textarea {
+    width: 100%; max-width: min(120ch, 100%); padding: 12px 14px; border: 1.5px solid var(--border);
+    border-radius: 10px; background: var(--field-bg); color: var(--ink); resize: vertical;
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 13px; line-height: 1.55;
+  }
+  textarea:focus { outline: none; border-color: var(--brand); background: #fff;
+    box-shadow: 0 0 0 3px rgba(1,118,211,.15); }
+  /* native clear (✕) for search inputs */
+  input.searchbox::-webkit-search-cancel-button {
+    -webkit-appearance: none; appearance: none;
+    height: 15px; width: 15px; margin-left: 6px; cursor: pointer; opacity: .55;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235b6b83' stroke-width='2.6' stroke-linecap='round'%3E%3Cline x1='18' y1='6' x2='6' y2='18'/%3E%3Cline x1='6' y1='6' x2='18' y2='18'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: center; background-size: 13px;
+  }
+  input.searchbox::-webkit-search-cancel-button:hover { opacity: 1; }
+  select { appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235b6b83' stroke-width='2.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 14px center; padding-right: 38px;
+  }
+
+  button { border: 0; border-radius: 10px; font-family: inherit; font-weight: 600; cursor: pointer;
+    transition: transform .08s, box-shadow .15s, background .15s; }
+  .primary {
+    width: 100%; margin-top: 24px; padding: 13px 20px; font-size: 15px; color: #fff;
+    background: linear-gradient(180deg, var(--brand-2), var(--brand));
+    box-shadow: 0 8px 18px -6px rgba(1,118,211,.55), inset 0 1px 0 rgba(255,255,255,.25);
+    display: flex; align-items: center; justify-content: center; gap: 9px;
+  }
+  .primary:hover { background: linear-gradient(180deg, #2aa0ff, #0169bd); }
+  .primary:active { transform: translateY(1px); }
+  .primary:disabled { background: #9db3c8; box-shadow: none; cursor: default; }
+  .primary svg { width: 17px; height: 17px; }
+  .content .primary { width: fit-content; display: flex; padding: 12px 26px; font-size: 14px; }
+  .ghost {
+    background: rgba(255,255,255,.08); color: #d5deeb; font-weight: 600; font-size: 13px;
+    padding: 9px 16px; border-radius: 9px; border: 1px solid rgba(255,255,255,.22);
+    display: inline-flex; align-items: center; gap: 7px;
+  }
+  .ghost svg { width: 15px; height: 15px; }
+  .ghost:hover { background: rgba(186,5,23,.25); border-color: rgba(229,99,111,.6); color: #fff; }
+
+  /* ---------- app shell (connected) ---------- */
+  #app { display: none; flex-direction: column; width: 100%; max-width: 100%; min-height: 0; }
+  .topbar {
+    display: flex; align-items: center; gap: 14px; margin-bottom: 20px; color: #fff;
+  }
+  .topbar .logo {
+    width: 38px; height: 38px; border-radius: 10px; flex: none;
+    background: linear-gradient(135deg, var(--brand-2), var(--brand-dark));
+    display: grid; place-items: center; box-shadow: 0 4px 12px -2px rgba(1,118,211,.5);
+  }
+  .topbar .logo svg { width: 20px; height: 20px; color: #fff; }
+  .topbar .t1 { font-size: 16px; font-weight: 700; }
+  .topbar .t2 {
+    font-size: 12px; color: #8fa2bd; display: flex; align-items: center; gap: 7px;
+    margin-top: 1px; min-width: 0; white-space: nowrap;
+  }
+  .topbar .t2 #whoami { overflow: hidden; text-overflow: ellipsis; }
+  /* the text block must be allowed to shrink, or the ellipsis never kicks in */
+  .topbar > div:not(.logo):not(.spacer) { min-width: 0; }
+  .topbar { flex: none; }
+  .envbadge {
+    font-size: 10px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 999px; flex: none; border: 1px solid transparent;
+  }
+  .envbadge.sandbox { background: rgba(27,150,255,.16); color: #7cc4ff; border-color: rgba(27,150,255,.45); }
+  .envbadge.prod { background: rgba(226,62,74,.18); color: #ff9aa2; border-color: rgba(226,62,74,.55); }
+  .envbadge.unknown { background: rgba(255,255,255,.08); color: #b8c6da; border-color: rgba(255,255,255,.2); }
+  /* production also tints the whole bar's rule, so it reads from the corner of the eye */
+  .topbar.prod .t1 { color: #ffd9dc; }
+  .topbar .t2 .dot { width: 7px; height: 7px; border-radius: 50%; background: #45c06d; flex: none;
+    box-shadow: 0 0 0 3px rgba(69,192,109,.2); }
+  .topbar .spacer { flex: 1; }
+
+  .shell { display: grid; grid-template-columns: 224px minmax(0, 1fr); gap: 16px; align-items: start; }
+  .shell > * { min-width: 0; }
+  body { overflow-x: hidden; }
+  .side {
+    background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.09);
+    border-radius: 14px; padding: 8px; backdrop-filter: blur(6px);
+  }
+  .navitem {
+    display: flex; align-items: center; gap: 11px; width: 100%;
+    padding: 11px 13px; border-radius: 9px; background: transparent; text-align: left;
+    color: #a7b4c9; font-size: 13.5px; font-weight: 600;
+  }
+  .navitem svg { width: 17px; height: 17px; flex: none; }
+  .navitem:hover { background: rgba(255,255,255,.07); color: #fff; }
+  .navitem.active {
+    background: linear-gradient(180deg, var(--brand-2), var(--brand)); color: #fff;
+    box-shadow: 0 6px 14px -4px rgba(1,118,211,.55);
+  }
+  .side .group {
+    font-size: 10.5px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
+    color: #64748f; padding: 12px 13px 6px;
+  }
+
+  .content {
+    background: var(--panel); border-radius: 16px; padding: 30px 34px 26px;
+    box-shadow: 0 24px 60px -18px rgba(2,12,30,.55), 0 2px 8px rgba(2,12,30,.25);
+  }
+  .content h2 { font-size: 18px; font-weight: 700; letter-spacing: -.01em; }
+  .content .sub2 { font-size: 13px; color: var(--muted); margin: 6px 0 0; line-height: 1.6; max-width: none; }
+  /* vertical rhythm: the description ends a block, so what follows needs air */
+  .content > div > .sub2 { margin-bottom: 22px; }
+  .content h2 + .sub2 { margin-bottom: 22px; }
+  .content label { margin-top: 20px; }
+  .content .sub2 + label,
+  .content .sub2 + .rowgrid,
+  .content .sub2 + .optgrid,
+  .content .sub2 + input,
+  .content .sub2 + select { margin-top: 0; }
+  .content .rowgrid { margin-top: 10px; row-gap: 14px; }
+  .content .optgrid { margin-top: 18px; }
+  .content .pickmeta { margin-top: 10px; margin-bottom: 4px; }
+  .content .picklist { margin-top: 10px; }
+  .content .tblwrap { margin-top: 14px; }
+  /* the action-button rows are inline-styled flex containers */
+  .content .btnrow { margin-top: 22px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .content .emptyhint { margin-top: 22px; }
+  .content .resultbox { margin-top: 22px; }
+  .content input[type=text], .content input[type=search], .content input[type=date], .content select { max-width: 560px; display: block; }
+  .content .chk, .content .picker { max-width: none; }
+  .content .foot { max-width: none; }
+  /* Sticky alone does nothing once twenty panels make the nav taller than the screen, so it
+     also gets its own height cap and scrollbar. The page then never scrolls to reach a panel. */
+  .side {
+    position: sticky; top: 20px;
+    max-height: calc(100vh - 40px); overflow-y: auto; overscroll-behavior: contain;
+    scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.28) transparent;
+  }
+  .side::-webkit-scrollbar { width: 8px; }
+  .side::-webkit-scrollbar-track { background: transparent; }
+  .side::-webkit-scrollbar-thumb { background: rgba(255,255,255,.22); border-radius: 8px; }
+  .side::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.34); }
+
+  /* health tiles */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; margin-top: 18px; }
+  .tile {
+    border: 1.5px solid var(--border); border-radius: 12px; padding: 14px 16px; background: #fff;
+    box-shadow: 0 2px 6px rgba(2,12,30,.07), 0 8px 20px -12px rgba(2,12,30,.18);
+    transition: transform .16s ease, box-shadow .16s ease;
+  }
+  .tile:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 14px rgba(2,12,30,.10), 0 16px 34px -14px rgba(2,12,30,.28);
+  }
+  .tile.c0 { background: #eef6ff; border-color: #cfe6fb; } .tile.c0 .tl { color: #0b5cab; }
+  .tile.c1 { background: #f3efff; border-color: #ddd2f7; } .tile.c1 .tl { color: #5a3fc0; }
+  .tile.c2 { background: #e9f8f2; border-color: #c8ebda; } .tile.c2 .tl { color: #0e7a52; }
+  .tile.c3 { background: #fff6e8; border-color: #f6e2bd; } .tile.c3 .tl { color: #9a6a10; }
+  .tile.c4 { background: #ffeff2; border-color: #f9d3da; } .tile.c4 .tl { color: #b0335a; }
+  .tile.c5 { background: #edf8fb; border-color: #cdeaf2; } .tile.c5 .tl { color: #0a6e8a; }
+  .tile .tl { font-size: 12px; font-weight: 700; color: var(--muted); }
+  .tile .tv { font-size: 20px; font-weight: 800; letter-spacing: -.02em; margin-top: 5px; }
+  .tile .tv small { font-size: 12px; font-weight: 500; color: var(--faint); }
+  .tile .tbar { height: 6px; background: var(--field-bg); border-radius: 3px; margin-top: 10px; overflow: hidden; }
+  .tile .tbar > div { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--brand), var(--brand-2)); }
+  .tile.warn .tbar > div { background: linear-gradient(90deg, #d97a2b, #f0a04b); }
+  .tile.crit .tbar > div { background: linear-gradient(90deg, var(--err), #e5636f); }
+  .tile .tp { font-size: 11.5px; color: var(--faint); margin-top: 6px; }
+  .facts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+  .fact {
+    background: #fff; border: 1px solid var(--border); border-radius: 999px;
+    font-size: 12px; font-weight: 600; color: var(--muted); padding: 6px 13px;
+    box-shadow: 0 1px 4px rgba(2,12,30,.07);
+    transition: transform .16s ease, box-shadow .16s ease;
+  }
+  .fact:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(2,12,30,.12); }
+  .fact b { color: var(--ink); }
+
+  .optgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+  .optgrid .chk { margin-top: 0; max-width: none; }
+  .optgrid .picker { grid-column: 1 / -1; margin-top: 0; max-width: none; }
+  @media (max-width: 700px) { .optgrid { grid-template-columns: 1fr; } }
+  .chk {
+    display: flex; align-items: flex-start; gap: 10px; margin-top: 14px;
+    background: var(--field-bg); border: 1.5px solid var(--border); border-radius: 10px;
+    padding: 12px 14px; cursor: pointer; transition: border-color .15s;
+  }
+  .chk {
+    box-shadow: 0 1px 4px rgba(2,12,30,.05);
+    transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease, background .16s ease;
+  }
+  .chk:hover {
+    border-color: #b9d5ef; transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(2,12,30,.09), 0 12px 26px -14px rgba(1,118,211,.3);
+  }
+  .chk:has(input:checked) {
+    background: linear-gradient(180deg, #f2f8ff, #ffffff 70%);
+    border-color: #cfe6fb;
+  }
+  .chk:has(input:checked) .t { color: var(--brand-dark); }
+  .chk input { margin-top: 2px; accent-color: var(--brand); width: 15px; height: 15px; cursor: pointer; }
+  .chk .t { font-size: 13.5px; font-weight: 500; }
+  .chk .s { font-size: 12px; color: var(--faint); margin-top: 2px; }
+
+  .picker { display: none; margin-top: 10px; }
+  .picklist {
+    margin-top: 8px; max-width: none; border: 1.5px solid var(--border); border-radius: 12px;
+    background: #fff; max-height: 210px; overflow-y: auto; padding: 4px;
+    box-shadow: 0 2px 6px rgba(2,12,30,.06), 0 10px 24px -16px rgba(2,12,30,.2);
+  }
+  .picklist label {
+    display: flex; align-items: center; gap: 9px; margin: 0; padding: 7px 10px;
+    font-weight: 500; font-size: 13px; border-radius: 7px; cursor: pointer;
+  }
+  .picklist label:hover { background: var(--field-bg); }
+  .picklist input { accent-color: var(--brand); width: 14px; height: 14px; flex: none; cursor: pointer; }
+  #mxSlots {
+    display: grid; gap: 10px; margin-top: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));   /* two per row, A|B then C|D */
+  }
+  @media (max-width: 760px) { #mxSlots { grid-template-columns: 1fr; } }
+  .mxslot {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    background: var(--field-bg); border: 1.5px solid var(--border); border-radius: 10px;
+    padding: 10px 12px;
+  }
+  #profSlots {
+    display: grid; gap: 12px; margin-top: 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  @media (max-width: 760px) { #profSlots { grid-template-columns: 1fr; } }
+  .profslot {
+    background: var(--field-bg); border: 1.5px solid var(--border); border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .profslot.fixed { background: #eef6ff; border-color: #b9dcff; }
+  .profslot label { margin-top: 10px; }
+  .profslot select { margin: 0; max-width: none; }
+  .profslot .shead { display: flex; align-items: center; gap: 9px; }
+  .profslot .drop {
+    margin-left: auto; background: transparent; color: var(--faint); border-radius: 8px;
+    width: 26px; height: 26px; font-size: 15px; line-height: 1;
+  }
+  .profslot .drop:hover { background: #ffeff2; color: var(--err); }
+  .sidehdr {
+    display: flex; align-items: center; gap: 9px; font-size: 11px; font-weight: 700;
+    letter-spacing: .07em; text-transform: uppercase; color: var(--brand-dark);
+  }
+  .sidehdr .tag {
+    display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 8px;
+    background: var(--brand); color: #fff; font-size: 12px; letter-spacing: 0;
+  }
+  .mxslot.fixed { background: #eef6ff; border-color: #b9dcff; }
+  .mxslot .who { font-weight: 700; font-size: 13.5px; }
+  .mxslot .note { font-size: 12.5px; color: var(--muted); }
+  .mxslot .tag {
+    display: inline-grid; place-items: center; width: 26px; height: 26px; flex: none;
+    border-radius: 8px; background: var(--brand); color: #fff; font-size: 12px; font-weight: 700;
+  }
+  .mxslot select { flex: 1 1 150px; max-width: none; margin: 0; }
+  .mxslot .refwrap {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted);
+    font-weight: 600; white-space: nowrap;
+  }
+  .mxslot .refwrap input { accent-color: var(--brand); }
+  .mxslot .drop {
+    margin-left: auto; background: transparent; color: var(--faint); border-radius: 8px;
+    width: 26px; height: 26px; font-size: 15px; line-height: 1;
+  }
+  .mxslot .drop:hover { background: #ffeff2; color: var(--err); }
+  .acwrap { position: relative; }
+  .aclist {
+    position: absolute; left: 0; right: 0; top: 100%; z-index: 40;
+    background: #fff; border: 1.5px solid var(--brand); border-top: none;
+    border-radius: 0 0 10px 10px; box-shadow: 0 14px 30px -12px rgba(2,12,30,.45);
+    max-height: 240px; overflow-y: auto; padding: 4px;
+  }
+  .aclist .row {
+    display: flex; align-items: center; gap: 10px; padding: 6px 10px;
+    border-radius: 7px; cursor: pointer; font-size: 13px;
+  }
+  .aclist .row.on { background: var(--accent-soft, #e8f2fc); }
+  .aclist .row:hover { background: var(--field-bg); }
+  .aclist .row .nm { font-family: ui-monospace, Consolas, monospace; font-weight: 600; }
+  .aclist .row .ty { color: var(--faint); font-size: 11.5px; margin-left: auto; font-family: ui-monospace, Consolas, monospace; }
+  .aclist .row .lb { color: var(--muted); font-size: 12px; }
+  .aclist .kind {
+    font-size: 9px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+    padding: 2px 5px; border-radius: 4px; background: var(--field-bg); color: var(--muted); flex: none;
+  }
+  .aclist .kind.obj { background: #e8f2fc; color: var(--brand-dark); }
+  .aclist .kind.rel { background: #fff1e2; color: #8a4a12; }
+  .aclist .kind.all { background: #e7f6ec; color: #1c6b38; }
+  .codelines {
+    margin-top: 10px; max-height: 460px; overflow: auto; border: 1.5px solid var(--border);
+    border-radius: 10px; background: #fbfdff; padding: 8px 0;
+    font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; line-height: 1.55;
+  }
+  .codelines .ln { display: flex; gap: 12px; padding: 0 12px; white-space: pre; }
+  .codelines .ln .no { color: var(--faint); user-select: none; text-align: right; flex: none; }
+  .codelines .ln.hit { background: #fff8e6; }
+  .codelines .ln.here { background: #e8f2fc; outline: 1px solid #b9dcff; }
+  .codelines .ln .src { flex: 1; }
+  .filetabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0 0; }
+  .filetabs button {
+    margin: 0; padding: 6px 12px; font-size: 12.5px; font-weight: 600;
+    background: var(--field-bg); color: var(--muted); border: 1.5px solid var(--border);
+    border-radius: 8px 8px 0 0; border-bottom-color: transparent; cursor: pointer;
+    font-family: ui-monospace, Consolas, monospace;
+  }
+  .filetabs button:hover { color: var(--ink); }
+  .filetabs button.on { background: #fff; color: var(--brand-dark); border-color: var(--brand); }
+  .filetabs .ext { color: var(--faint); font-weight: 500; }
+  .filetabs button.on .ext { color: var(--brand); }
+  .picklist .slot {
+    display: inline-grid; place-items: center; width: 18px; height: 18px; flex: none;
+    border-radius: 5px; background: var(--brand); color: #fff;
+    font-size: 10.5px; font-weight: 700; margin-right: 2px;
+  }
+  .picklist .api { color: var(--faint); font-size: 11.5px; margin-left: auto; font-family: ui-monospace, Consolas, monospace; }
+  .pickmeta { display: flex; gap: 12px; align-items: center; font-size: 12px; color: var(--faint); margin-top: 7px; }
+  .pickmeta a { color: var(--brand); cursor: pointer; font-weight: 600; text-decoration: none; }
+  .pickmeta a:hover { text-decoration: underline; }
+
+  /* tables (object browser / on-screen views) */
+  .tblwrap {
+    max-height: 430px; overflow: auto; height: auto; border: 1.5px solid var(--border); border-radius: 12px;
+    margin-top: 12px; background: #fff;
+    box-shadow: 0 2px 6px rgba(2,12,30,.06), 0 10px 24px -16px rgba(2,12,30,.2);
+  }
+  .tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .tbl th {
+    position: sticky; top: 0; background: var(--field-bg); text-align: left;
+    padding: 9px 12px; border-bottom: 1.5px solid var(--border);
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); z-index: 1;
+  }
+  .tbl td { padding: 7px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .tbl tr:hover td { background: #f9fbfe; }
+  .tbl .mono { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; color: var(--muted); }
+  .tbl .accNone { color: var(--err); font-weight: 700; }
+  .tbl .accEdit { color: var(--ok); font-weight: 700; }
+  .tbl .accRead { color: var(--brand-dark); font-weight: 600; }
+  .objrow { cursor: pointer; }
+  .objrow:hover td { background: #f2f8ff; }
+  .objrow td:first-child { color: var(--brand); font-weight: 600; }
+  .objrow:hover td:first-child { text-decoration: underline; }
+  .objrow.sel td:first-child { color: var(--brand-dark); }
+  .tbl mark { background: #ffe9a8; color: inherit; border-radius: 3px; padding: 0 1px; }
+  .tbl tr.sel td { background: #e3f0fd; }
+  .tbl tr.sel td:first-child { box-shadow: inset 4px 0 0 var(--brand); font-weight: 700; }
+  .tbl tr.sel td:last-child { box-shadow: inset -1px 0 0 rgba(1,118,211,.25); }
+  @keyframes flashbox {
+    0% { box-shadow: 0 0 0 4px rgba(1,118,211,.45); }
+    100% { box-shadow: 0 0 0 0 rgba(1,118,211,0); }
+  }
+  #bFLSInline, #permResult, #bRTInline, #autoResult, .resultbox {
+    border-radius: 14px; padding: 18px 20px 16px; margin-top: 20px;
+    background: linear-gradient(180deg, #f2f8ff, #ffffff 60%);
+    border: 1.5px solid #cfe6fb;
+    box-shadow: 0 4px 10px rgba(2,12,30,.08), 0 18px 40px -18px rgba(1,118,211,.35);
+  }
+  #bFLSInline h2, #permResult h2, #bRTInline h2, #autoResult h2, .resultbox h2 { color: var(--brand-dark); }
+  #bFLSInline.flash, #permResult.flash, #bRTInline.flash, #autoResult.flash, .resultbox.flash { animation: flashbox 1.2s ease-out; }
+  .fieldhdr { display: flex; align-items: center; gap: 9px; }
+  #codeViewBody {
+    margin: 10px 0 0; padding: 14px 16px; max-height: 420px; overflow: auto;
+    background: #0e1726; color: #dbe6f5; border-radius: 10px;
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 12px; line-height: 1.55;
+    white-space: pre; tab-size: 4;
+  }
+  #erdCanvasWrap {
+    margin-top: 12px; border: 1.5px solid var(--border); border-radius: 12px; background: #fff;
+    overflow: hidden; box-shadow: 0 2px 6px rgba(2,12,30,.06);
+  }
+  #erdSvg { display: block; width: 100%; height: 620px; cursor: grab; touch-action: none; }
+  #erdSvg.dragging { cursor: grabbing; }
+  #erdSvg .node rect { fill: #fff; stroke: #cfe6fb; stroke-width: 1.5; }
+  #erdSvg .node.seed rect { stroke: var(--brand); stroke-width: 2; }
+  #erdSvg .node .hdr { fill: #eaf3fc; }
+  #erdSvg .node.seed .hdr { fill: #d8ebfb; }
+  #erdSvg .node text { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; }
+  #erdSvg .node .title { font-size: 12.5px; font-weight: 700; fill: #0b3d68; }
+  #erdSvg .node .api { font-size: 10px; fill: #5b6b83; font-family: ui-monospace, Consolas, monospace; }
+  #erdSvg .node .fld { font-size: 10.5px; fill: #33415c; font-family: ui-monospace, Consolas, monospace; }
+  #erdSvg.compact .node .api { display: none; }
+  #erdSvg.compact .elabel, #erdSvg.compact .elabelbg { display: none; }
+  #erdSvg .node { cursor: move; }
+  #erdSvg.focusing .node, #erdSvg.focusing .edge, #erdSvg.focusing .elabel, #erdSvg.focusing .elabelbg { opacity: .14; transition: opacity .12s; }
+  #erdSvg.focusing .node.lit, #erdSvg.focusing .edge.lit, #erdSvg.focusing .elabel.lit, #erdSvg.focusing .elabelbg.lit { opacity: 1; }
+  #erdSvg .node .expand circle { fill: #fff; stroke: #0176d3; stroke-width: 1.4; }
+  #erdSvg .node .expand path { stroke: #0176d3; stroke-width: 1.8; fill: none; }
+  #erdSvg .node .expand { cursor: pointer; opacity: .5; }
+  #erdSvg .node:hover .expand { opacity: 1; }
+  #erdSvg .edge { fill: none; stroke: #8fb8dd; stroke-width: 1.6; }
+  #erdSvg .edge.md { stroke: #0b5cab; stroke-width: 2.2; }
+  #erdSvg .edge.lookup { stroke-dasharray: 6 4; }
+  #erdSvg .edge.poly { stroke-dasharray: 2 3; }
+  #erdSvg .selfloop { fill: none; stroke: #8fb8dd; stroke-width: 1.6; }
+  #erdSvg .node.junction rect { stroke: #b0335a; }
+  #erdSvg .node.junction .hdr { fill: #ffeff2; }
+  #erdSvg .jbadge rect { fill: #b0335a; stroke: none; }
+  #erdSvg .jbadge text { font-size: 9px; font-weight: 700; fill: #fff; }
+  #erdSvg .node .ftype { font-size: 9.5px; fill: #7b8ba3; font-family: ui-monospace, Consolas, monospace; }
+  #erdSvg .node .fkey { font-size: 9.5px; }
+  #erdSvg .node .sep { stroke: #e5eaf1; stroke-width: 1; }
+  #erdSvg .node .hdr { fill: url(#erdHdr); }
+  #erdSvg .node.seed .hdr { fill: url(#erdHdrSeed); }
+  #erdSvg .node.junction .hdr { fill: url(#erdHdrJ); }
+  #erdSvg .node .hdrline { stroke: #cfe0f2; stroke-width: 1; }
+  #erdSvg .node .shadow { fill: rgba(10,30,60,.13); stroke: none; filter: blur(3px); }
+  #erdSvg .node .zebra { fill: #f7fafd; stroke: none; }
+  #erdSvg .node.hit rect:not(.shadow):not(.zebra) { stroke: #b8621b; stroke-width: 2.4; }
+  #erdSvg .node.hit .hdr { fill: #fff1e2; }
+  #erdSvg.dark .node .hdrline { stroke: #33507a; }
+  #erdSvg.dark .node .shadow { fill: rgba(0,0,0,.45); }
+  #erdSvg.dark .node .zebra { fill: #1b2942; }
+  #erdSvg.dark .node .hdr,
+  #erdSvg.dark .node.seed .hdr,
+  #erdSvg.dark .node.junction .hdr { fill: #1e2d49; }
+  /* dark diagram */
+  #erdCanvasWrap.dark { background: #0e1726; border-color: #24304a; }
+  #erdSvg.dark .node rect { fill: #16223a; stroke: #2f4straight; }
+  #erdSvg.dark .node rect { fill: #16223a; stroke: #33507a; }
+  #erdSvg.dark .node.seed rect { stroke: #4da3ea; }
+  #erdSvg.dark .node .hdr { fill: #1d2d४a; }
+  #erdSvg.dark .node .hdr { fill: #1d2d4a; }
+  #erdSvg.dark .node.seed .hdr { fill: #24406b; }
+  #erdSvg.dark .node .title { fill: #cfe4fa; }
+  #erdSvg.dark .node .api { fill: #8fa2bd; }
+  #erdSvg.dark .node .fld { fill: #c3d3ea; }
+  #erdSvg.dark .node .ftype { fill: #7f93b3; }
+  #erdSvg.dark .node .sep { stroke: #2a3b5c; }
+  #erdSvg.dark .edge { stroke: #6f9dcb; }
+  #erdSvg.dark .edge.md { stroke: #7db8ee; }
+  #erdSvg.dark .selfloop { stroke: #6f9dcb; }
+  #erdSvg.dark .elabel { fill: #9fb4d0; }
+  #erdSvg.dark .elabelbg { fill: #0e1726; opacity: .9; }
+  #erdSvg.dark .node.junction rect { stroke: #e5636f; }
+  #erdSvg.dark .node.junction .hdr { fill: #3a1c26; }
+  #erdSvg .elabel { font-size: 9.5px; fill: #5b6b83; font-family: ui-monospace, Consolas, monospace; }
+  #erdSvg .elabelbg { fill: #ffffff; opacity: .85; }
+  .erdlegend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 10px; }
+  .erdlegend span { display: inline-flex; align-items: center; gap: 6px; }
+  .erdlegend i { width: 26px; height: 0; border-top: 2px solid #0b5cab; display: inline-block; }
+  .erdlegend i.dash { border-top: 2px dashed #8fb8dd; }
+  .boxcopy {
+    margin-left: auto; background: var(--field-bg); border-radius: 8px; padding: 5px 10px;
+    font-size: 11.5px; font-weight: 600; color: var(--muted); border: 1px solid var(--border);
+  }
+  .boxcopy:hover { background: var(--accent-wash, #eaf3fc); color: var(--brand-dark); border-color: #cfe6fb; }
+  .boxcopy + .boxclose { margin-left: 8px; }
+  .boxclose {
+    margin-left: auto; background: var(--field-bg); border-radius: 8px; width: 26px; height: 26px;
+    font-size: 15px; line-height: 1; color: var(--muted); flex: none;
+  }
+  .boxclose:hover { background: #ffeff2; color: var(--err); }
+  .emptyhint {
+    margin-top: 16px; padding: 14px 16px; border: 1.5px dashed var(--border); border-radius: 12px;
+    background: var(--field-bg); color: var(--faint); font-size: 13px; max-width: none;
+  }
+  .fieldhdr .pill {
+    background: var(--brand); color: #fff; font-size: 10.5px; font-weight: 700;
+    letter-spacing: .06em; text-transform: uppercase; padding: 3px 9px; border-radius: 999px;
+  }
+  .accsum { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .accsum span {
+    font-size: 11.5px; font-weight: 700; padding: 5px 11px; border-radius: 999px;
+    border: 1px solid transparent;
+  }
+  .accsum .e { background: #e9f8f2; color: #0e7a52; border-color: #c8ebda; }
+  .accsum .r { background: #eef6ff; color: #0b5cab; border-color: #cfe6fb; }
+  .accsum .n { background: #ffeff2; color: #b0335a; border-color: #f9d3da; }
+  .crumb { font-size: 12.5px; color: var(--brand); font-weight: 600; cursor: pointer; margin-top: 14px; display: inline-block; }
+  .crumb:hover { text-decoration: underline; }
+  .rowgrid { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+  .rowgrid > div { flex: 1; min-width: 200px; }
+
+  /* modal */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(4,10,22,.6); z-index: 50;
+    display: none; align-items: center; justify-content: center; padding: 24px;
+  }
+  .overlay.open { display: flex; }
+  .modal {
+    background: #fff; border-radius: 14px; width: 100%; max-width: 560px;
+    max-height: 80vh; display: flex; flex-direction: column;
+    box-shadow: 0 30px 80px -20px rgba(2,12,30,.7);
+  }
+  .modal .mhead {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px; border-bottom: 1.5px solid var(--border);
+  }
+  .modal .mhead h3 { font-size: 14.5px; font-weight: 700; }
+  .modal .mclose {
+    background: var(--field-bg); border-radius: 8px; width: 28px; height: 28px;
+    font-size: 15px; color: var(--muted); line-height: 1;
+  }
+  .modal .mclose:hover { background: #ffeff2; color: var(--err); }
+  .modal .mbody { overflow-y: auto; padding: 6px 8px 12px; }
+  .pklink { color: var(--brand); font-weight: 600; cursor: pointer; text-decoration: none; }
+  .pklink:hover { text-decoration: underline; }
+
+  .bar { height: 8px; background: var(--border); border-radius: 4px; margin-top: 16px; overflow: hidden; display: none; }
+  .bar > div {
+    height: 100%; width: 0%; border-radius: 4px;
+    background: linear-gradient(90deg, var(--brand), var(--brand-2)); transition: width .25s;
+  }
+
+  .status { margin-top: 14px; font-size: 13.5px; min-height: 20px; color: var(--muted); display: flex; align-items: center; gap: 8px; word-break: break-word; min-width: 0; }
+  .status.err { color: var(--err); }
+  .status.ok { color: var(--ok); font-weight: 600; }
+  .spinner {
+    width: 14px; height: 14px; flex: none; border-radius: 50%;
+    border: 2px solid var(--border); border-top-color: var(--brand);
+    animation: spin .7s linear infinite; display: none;
+  }
+  .status.busy .spinner { display: block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .divider { height: 1px; background: var(--border); margin: 22px 0 14px; }
+  .foot { font-size: 12px; color: var(--faint); line-height: 1.65; }
+  .foot b { color: var(--muted); }
+  code {
+    background: var(--field-bg); border: 1px solid var(--border);
+    padding: 1px 6px; border-radius: 5px; font-size: 11.5px;
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  }
+  .page-foot { color: #5b6b83; font-size: 12px; margin-top: 26px; }
+  .page-foot a { color: #7ea9d8; text-decoration: none; }
+
+  @media (max-width: 820px) {
+    .shell { grid-template-columns: 1fr; }
+    .side { display: flex; overflow-x: auto; position: static; }
+    .side .group { display: none; }
+    .navitem { white-space: nowrap; width: auto; }
+  }
+  @media (max-width: 900px) {
+    .landgrid { grid-template-columns: 1fr; gap: 30px; min-height: 0; justify-items: center; }
+    .hero { text-align: center; margin-top: 12px; }
+    .trust { justify-content: center; }
+
+  }
+  @media (max-width: 560px) {
+    body { padding-top: 36px; }
+    .hero h1 { font-size: 27px; }
+    .card { padding: 26px 22px 22px; }
+    .trust { flex-wrap: wrap; gap: 10px 18px; }
+    .content { padding: 20px 18px 18px; }
+  }
+
+  /* ---- wide screens: last in the cascade so these win over the base rules ---- */
+  @media (min-width: 1700px) {
+    .shell { grid-template-columns: 260px minmax(0, 1fr); gap: 22px; }
+    .navitem { font-size: 14px; padding: 12px 15px; }
+    .content { padding: 34px 40px 30px; }
+    .content input[type=text], .content input[type=search], .content input[type=date], .content select { max-width: 680px; }
+    .optgrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .rowgrid > div { min-width: 240px; }
+  }
+  @media (min-width: 2200px) {
+    .shell { grid-template-columns: 300px minmax(0, 1fr); gap: 26px; }
+    .navitem { font-size: 14.5px; padding: 13px 17px; }
+    .content { padding: 40px 48px 36px; border-radius: 18px; }
+    .content h2 { font-size: 20px; }
+    .content .sub2 { font-size: 14px; max-width: 780px; }
+    .tbl { font-size: 13.5px; }
+    .tbl th { font-size: 11px; }
+    .tbl td { padding: 9px 14px; }
+    .tblwrap { max-height: 620px; }
+    .picklist { max-height: 320px; }
+    .tiles { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+    .optgrid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .content input[type=text], .content input[type=search], .content input[type=date], .content select { max-width: 760px; }
+  }
+
+  /* One screen, no page scroll. The sidebar and the panel each scroll inside their own box,
+     so the footer stays visible and a short panel no longer drags the whole page taller. */
+  @media (min-width: 760px) {
+    html, body { height: 100%; overflow: hidden; }
+    body { padding-bottom: 18px; }
+    /* The app hugs its content so the footer sits directly under the card: stretching the
+       shell to the full screen left a wide empty band between the two. Nothing scrolls the
+       page, because each column is capped against the window instead. */
+    #app { flex: 0 0 auto; min-height: 0; }
+    .shell { min-height: 0; align-items: start; }
+    /* 150px is the chrome around the shell: top bar, its margin, the footer and body padding */
+    .side, .content { align-self: start; max-height: var(--fitH, calc(100vh - 150px)); min-height: 0; }
+    .content { overflow-y: auto; }
+    .content::-webkit-scrollbar { width: 10px; }
+    .content::-webkit-scrollbar-track { background: transparent; }
+    .content::-webkit-scrollbar-thumb { background: #cfd9e6; border-radius: 8px; }
+    .content::-webkit-scrollbar-thumb:hover { background: #b6c5d8; }
+    .page-foot { flex: none; margin-top: 14px; }
+  }
+
+  /* Height-aware nav. Twenty panels at full spacing need about 1000px, which no laptop has,
+     so the shorter the screen the tighter the list: the aim is that the nav fits outright and
+     never needs its own scrollbar. Tall screens keep the roomier spacing. */
+  @media (min-width: 760px) and (max-height: 1000px) {
+    .side, .content { max-height: var(--fitH, calc(100vh - 138px)); }
+    .navitem { padding: 7px 12px; font-size: 13px; gap: 9px; }
+    .navitem svg { width: 16px; height: 16px; }
+    .group { padding: 9px 13px 4px; }
+    .topbar { margin-bottom: 14px; }
+    .content { padding: 24px 28px 22px; }
+  }
+  @media (min-width: 760px) and (max-height: 860px) {
+    .side, .content { max-height: var(--fitH, calc(100vh - 116px)); }
+    .navitem { padding: 4px 11px; font-size: 12.5px; gap: 8px; }
+    .navitem svg { width: 15px; height: 15px; }
+    .group { font-size: 9.5px; padding: 7px 12px 3px; }
+    .side { padding: 6px; }
+    .topbar { margin-bottom: 12px; }
+    .content { padding: 22px 26px 20px; }
+    body { padding-top: 22px; }
+  }
+  @media (min-width: 760px) and (max-height: 740px) {
+    .side, .content { max-height: var(--fitH, calc(100vh - 104px)); }
+    .navitem { padding: 5px 10px; font-size: 12px; }
+    .group { margin: 6px 0 2px; }
+    .content { padding: 20px 24px 18px; }
+    body { padding-top: 16px; }
+  }
+
+  /* Below the fill layout the shell stacks, so the nav goes back to being a plain list and
+     the page scrolls as before. */
+  @media (max-width: 759px) {
+    .side { position: static; max-height: none; overflow-y: visible; }
+  }
+  .inlineerr {
+    margin-top: 12px; padding: 10px 14px; border-radius: 10px;
+    background: #fff5f6; border: 1.5px solid var(--err); border-left-width: 4px;
+    color: #8f0a17; font-size: 13.5px; font-weight: 500;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ landing (not connected) ============ -->
+<div id="landing">
+  <div class="landgrid">
+  <div class="hero">
+    <div class="badge">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      No setup &middot; Uses your Salesforce login
+    </div>
+    <h1>Org <span>Lens</span></h1>
+    <p>See inside your Salesforce org: schema, permissions, automation and health, browsed live or exported to Excel in one click. It rides the session of the org you are already logged into; nothing is stored or sent anywhere.</p>
+    <div class="trust">
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5"/><path d="M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/></svg>No database, no server</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <label for="orgPick" style="margin-top:0;">Salesforce org <span class="hint">(orgs you are logged into)</span></label>
+    <select id="orgPick"></select>
+    <button class="primary" id="connectBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+      Open this org
+    </button>
+    <div class="pickmeta" style="margin-top:12px;"><a id="orgRefresh">Refresh org list</a> <span class="hint">(after logging into another org in a new tab)</span></div>
+    <div class="status" id="landingStatus"><span class="spinner"></span><span id="landingStatusText"></span></div>
+    <div class="divider"></div>
+    <div class="foot">
+      <b>Nothing to configure.</b> Org Lens uses the session of a tab you are already signed into. Your session id never leaves the browser.
+    </div>
+  </div>
+  </div>
+</div>
+
+<!-- ============ app shell (connected) ============ -->
+<div id="app">
+  <div class="topbar">
+    <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5"/><path d="M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/></svg></div>
+    <div>
+      <div class="t1">Org Lens</div>
+      <div class="t2"><span class="dot"></span><span class="envbadge" id="envBadge" style="display:none;"></span><span id="whoami">&nbsp;</span></div>
+    </div>
+    <div class="spacer"></div>
+    <button class="ghost" id="logoutBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Logout
+    </button>
+  </div>
+
+  <div class="shell">
+    <div class="side">
+      <div class="group">Org</div>
+      <button class="navitem active" data-panel="panelHealth">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        Org health
+      </button>
+      <button class="navitem" data-panel="panelBrowser">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        Object browser
+      </button>
+      <button class="navitem" data-panel="panelErd">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><path d="M10 6.5h4a1 1 0 0 1 1 1V14"/></svg>
+        Schema diagram
+      </button>
+      <button class="navitem" data-panel="panelCode">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        Code search
+      </button>
+      <button class="navitem" data-panel="panelSoql">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+        SOQL query
+      </button>
+      <div class="group">Exports</div>
+      <button class="navitem" data-panel="panelDoc">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
+        Documentation pack
+      </button>
+      <button class="navitem" data-panel="panelSchema">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Schema export
+      </button>
+      <button class="navitem" data-panel="panelPackage">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" y1="22" x2="12" y2="12"/></svg>
+        Deployment package
+      </button>
+      <div class="group">Operations</div>
+      <button class="navitem" data-panel="panelAudit">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/></svg>
+        Setup audit trail
+      </button>
+      <button class="navitem" data-panel="panelTests">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        Tests &amp; coverage
+      </button>
+      <button class="navitem" data-panel="panelCounts">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5"/><path d="M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/></svg>
+        Record counts
+      </button>
+      <button class="navitem" data-panel="panelJobs">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/><path d="M3.5 8.5 6 7"/></svg>
+        Scheduled &amp; failed jobs
+      </button>
+      <div class="group">Analysis</div>
+      <button class="navitem" data-panel="panelProfCmp">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Permission compare
+      </button>
+      <button class="navitem" data-panel="panelUserAccess">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        User access
+      </button>
+      <button class="navitem" data-panel="panelSharing">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="3"/><path d="M12 8v3"/><circle cx="6" cy="19" r="3"/><circle cx="18" cy="19" r="3"/><path d="M12 11H6v5"/><path d="M12 11h6v5"/></svg>
+        Sharing model
+      </button>
+      <button class="navitem" data-panel="panelSecurity">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Security posture
+      </button>
+      <button class="navitem" data-panel="panelPerms">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Permissions matrix
+      </button>
+      <button class="navitem" data-panel="panelCompare">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M8 21H3v-5"/><path d="M21 3 3 21"/></svg>
+        Org compare
+      </button>
+      <button class="navitem" data-panel="panelAuto">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>
+        Automation
+      </button>
+      <button class="navitem" data-panel="panelDeps">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M8.5 8.5 15.5 15.5"/><circle cx="18" cy="6" r="3"/><path d="M15.5 8.5 8.5 15.5"/><circle cx="6" cy="18" r="3"/></svg>
+        Where is it used?
+      </button>
+      <button class="navitem" data-panel="panelUsage">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Field usage
+      </button>
+    </div>
+
+    <div class="content">
+      <!-- Org health -->
+      <div id="panelHealth">
+        <h2>Org health</h2>
+        <div class="sub2">Live limits and usage, straight from the org. Refreshed each time you connect.</div>
+        <div class="facts" id="orgFacts"></div>
+        <div class="tiles" id="healthTiles"></div>
+        <h2 style="margin-top:26px; font-size:15px;">Org inventory</h2>
+        <div class="tiles" id="invTiles"></div>
+        <div class="status" id="healthStatus" style="margin-top:16px;"><span class="spinner"></span><span></span></div>
+        <div id="limitsBox" style="display:none; margin-top:22px;">
+          <div class="fieldhdr"><span class="pill">Limits</span><h2 style="font-size:15px;" id="limitsTitle"></h2></div>
+          <div class="sub2">Every limit this org reports, not just the six above. Anything at 70% or more is tinted, 90% or more is flagged.</div>
+          <input type="search" id="limitsFilter" class="searchbox" placeholder="Filter limits&hellip;" spellcheck="false" style="margin-top:12px; max-width:460px;">
+          <div class="tblwrap" style="max-height:420px;"><table class="tbl"><thead><tr><th>Limit</th><th>Used</th><th>Maximum</th><th>Remaining</th><th>Used %</th></tr></thead><tbody id="limitsList"></tbody></table></div>
+        </div>
+        <div class="btnrow" style="display:flex; gap:12px; flex-wrap:wrap;">
+          <button class="primary" id="limitsToggle">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            <span id="limitsToggleLabel">Show all limits</span>
+          </button>
+          <button class="primary" id="snapshotBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export health snapshot
+          </button>
+          <button class="primary" id="auditBtn" title="Health + schema + picklists + validation rules + automation in one workbook. Takes a few minutes on large orgs.">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            Export full org audit
+          </button>
+        </div>
+      </div>
+
+      <!-- Schema diagram -->
+      <div id="panelErd" style="display:none;">
+        <h2>Schema diagram</h2>
+        <div class="sub2">A relationship map of the objects you choose. Master-detail is drawn solid, lookups dashed, and each line is labelled with the field that makes it. Drag boxes to arrange, scroll to zoom, then export as SVG or PNG for documentation.</div>
+        <label for="erdSearch">Objects <span class="hint">(search and tick up to 12)</span></label>
+        <input type="search" id="erdSearch" class="searchbox" placeholder="Search objects&hellip;" spellcheck="false" style="max-width:560px;">
+        <div class="picklist" id="erdList" style="max-width:none;"></div>
+        <div class="pickmeta" style="max-width:none;"><span id="erdCount">0 selected</span> &middot; <a id="erdClear">clear all</a></div>
+        <div class="rowgrid" style="max-width:900px; margin-top:14px;">
+          <div>
+            <label for="erdDepth" style="margin-top:0;">Follow relationships</label>
+            <select id="erdDepth">
+              <option value="0">Only the objects I picked</option>
+              <option value="1" selected>1 hop (direct parents &amp; children)</option>
+              <option value="2">2 hops (one level further)</option>
+            </select>
+          </div>
+          <div>
+            <label for="erdDir" style="margin-top:0;">Layout</label>
+            <select id="erdDir">
+              <option value="DOWN" selected>Top to bottom</option>
+              <option value="RIGHT">Left to right</option>
+            </select>
+          </div>
+          <div>
+            <label for="erdBudget" style="margin-top:0;">Maximum boxes</label>
+            <select id="erdBudget">
+              <option value="15">15 (very readable)</option>
+              <option value="25" selected>25 (balanced)</option>
+              <option value="40">40 (dense)</option>
+              <option value="60">60 (overview only)</option>
+            </select>
+          </div>
+        </div>
+        <div class="optgrid" style="max-width:none;">
+          <label class="chk" for="erdCustomOnly">
+            <input type="checkbox" id="erdCustomOnly" checked>
+            <span>
+              <span class="t">Expand into custom objects only</span>
+              <span class="s" style="display:block;">Stops one hop pulling in dozens of standard objects (User, RecordType, Account&hellip;).</span>
+            </span>
+          </label>
+          <label class="chk" for="erdFields">
+            <input type="checkbox" id="erdFields" checked>
+            <span>
+              <span class="t">List relationship fields in each box</span>
+              <span class="s" style="display:block;">Turns off automatically on dense diagrams.</span>
+            </span>
+          </label>
+          <label class="chk" for="erdDetail">
+            <input type="checkbox" id="erdDetail">
+            <span>
+              <span class="t">Field detail with types</span>
+              <span class="s" style="display:block;">Key fields with data types: 🔑 unique or external id, * required, → lookup.</span>
+            </span>
+          </label>
+          <label class="chk" for="erdHops">
+            <input type="checkbox" id="erdHops" checked>
+            <span>
+              <span class="t">Hop over crossing lines</span>
+              <span class="s" style="display:block;">A small arc where one line crosses another, so a relationship can be followed by eye.</span>
+            </span>
+          </label>
+          <label class="chk" for="erdDark">
+            <input type="checkbox" id="erdDark">
+            <span>
+              <span class="t">Dark diagram</span>
+              <span class="s" style="display:block;">Applies on screen and to exported SVG, PNG and PDF.</span>
+            </span>
+          </label>
+        </div>
+        <div class="btnrow" style="display:flex; gap:12px; flex-wrap:wrap;">
+          <button class="primary" id="erdDrawBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><path d="M10 6.5h4a1 1 0 0 1 1 1V14"/></svg>
+            Draw diagram
+          </button>
+          <button class="primary" id="erdFitBtn" title="Zoom the whole diagram into view">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+            Fit
+          </button>
+          <button class="primary" id="erdUndoBtn" title="Undo the last box move (Ctrl+Z)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M3.51 13a9 9 0 1 0 2.13-9.36L3 7"/></svg>
+            Undo move
+          </button>
+          <button class="primary" id="erdRelayoutBtn" title="Re-run the layout engine after moving boxes">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            Tidy layout
+          </button>
+          <button class="primary" id="erdSvgBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export SVG
+          </button>
+          <button class="primary" id="erdPdfBtn" title="Opens the print dialog; choose Save as PDF for a vector file">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Export PDF
+          </button>
+          <button class="primary" id="erdPngBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            Export PNG
+          </button>
+        </div>
+        <div id="erdResult" class="resultbox" style="display:none;">
+          <div class="fieldhdr" style="margin-top:4px;"><span class="pill">Diagram</span><h2 id="erdResTitle" style="font-size:15px;"></h2></div>
+          <div class="sub2" id="erdResNote"></div>
+          <div class="accsum" id="erdResSummary"></div>
+          <input type="search" id="erdFind" class="searchbox" placeholder="Find an object in the diagram&hellip;" spellcheck="false" style="margin-top:12px; max-width:420px;">
+        <div id="erdCanvasWrap"><svg id="erdSvg" xmlns="http://www.w3.org/2000/svg"></svg></div>
+        </div>
+      </div>
+
+      <!-- Code search -->
+      <div id="panelCode" style="display:none;">
+        <h2>Code search</h2>
+        <div class="sub2">Search the text of your Apex, Visualforce, LWC and Aura source for a string. This answers the &ldquo;where do we call this endpoint?&rdquo; question. Managed-package code is skipped because its body is not readable.</div>
+        <label for="codeTerm">Search for</label>
+        <input type="search" id="codeTerm" class="searchbox" placeholder="e.g. callout, HttpRequest, myEndpoint.com, TODO" spellcheck="false" style="max-width:560px;">
+        <div class="optgrid" style="max-width:none;">
+          <label class="chk" for="codeApex">
+            <input type="checkbox" id="codeApex" checked>
+            <span><span class="t">Apex classes &amp; triggers</span></span>
+          </label>
+          <label class="chk" for="codeVf">
+            <input type="checkbox" id="codeVf" checked>
+            <span><span class="t">Visualforce pages &amp; components</span></span>
+          </label>
+          <label class="chk" for="codeLwc">
+            <input type="checkbox" id="codeLwc" checked>
+            <span><span class="t">LWC source</span></span>
+          </label>
+          <label class="chk" for="codeAura">
+            <input type="checkbox" id="codeAura">
+            <span><span class="t">Aura source</span></span>
+          </label>
+          <label class="chk" for="codeCase">
+            <input type="checkbox" id="codeCase">
+            <span><span class="t">Match case</span></span>
+          </label>
+        </div>
+        <div class="btnrow" style="display:flex; gap:12px; flex-wrap:wrap;">
+          <button class="primary" id="codeListBtn" title="List every file of the ticked types, no search term needed">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            List all files
+          </button>
+          <button class="primary" id="codeSearchBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Search code
+          </button>
+          <button class="primary" id="codeExportBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export matches
+          </button>
+        </div>
+        <div id="codeListResult" class="resultbox" style="display:none;">
+          <div class="fieldhdr" style="margin-top:4px;"><span class="pill">Files</span><h2 id="codeListTitle" style="font-size:15px;"></h2></div>
+          <div class="sub2" id="codeListNote"></div>
+          <div class="accsum" id="codeListSummary"></div>
+          <input type="search" id="codeListFilter" class="searchbox" placeholder="Filter by name&hellip;" spellcheck="false" style="margin-top:12px; max-width:560px;">
+          <div class="tblwrap" style="max-height:360px;"><table class="tbl"><thead><tr><th>Component</th><th>Type</th><th>API</th><th>Lines</th><th>Chars</th></tr></thead><tbody id="codeListBody"></tbody></table></div>
+          <div id="codeViewer" style="display:none; margin-top:14px;">
+            <div class="fieldhdr"><span class="pill">Source</span><h2 id="codeViewTitle" style="font-size:14px;"></h2></div>
+            <div class="filetabs" id="codeTabs" style="display:none;"></div>
+            <pre id="codeViewBody"></pre>
+          </div>
+        </div>
+        <div id="codeHitBox" class="resultbox" style="display:none;">
+          <div class="fieldhdr" style="margin-top:4px;">
+            <span class="pill">File</span><h2 id="codeHitTitle" style="font-size:15px;"></h2>
+            <button class="mclose" id="codeHitClose" title="Close">&times;</button>
+          </div>
+          <div class="codelines" id="codeHitBody"></div>
+        </div>
+        <div id="codeResult" class="resultbox" style="display:none;">
+          <div class="fieldhdr" style="margin-top:4px;"><span class="pill">Matches</span><h2 id="codeResTitle" style="font-size:15px;"></h2></div>
+          <div class="sub2" id="codeResNote"></div>
+          <div class="accsum" id="codeResSummary"></div>
+          <div class="tblwrap" style="max-height:420px;"><table class="tbl"><thead><tr><th>Component</th><th>Type</th><th>Line</th><th>Code</th></tr></thead><tbody id="codeResList"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- SOQL query -->
+      <div id="panelSoql" style="display:none;">
+        <h2>SOQL query</h2>
+        <div class="sub2">Run a read-only query against this org and read the rows here or export them. Queries only: the endpoint cannot insert, update or delete anything.</div>
+        <label for="soqlText">Query <span class="hint">(Ctrl+Space for suggestions; they also appear as you type)</span></label>
+        <div class="acwrap">
+          <textarea id="soqlText" spellcheck="false" rows="4" placeholder="SELECT Id, Name, CreatedDate FROM Account ORDER BY CreatedDate DESC LIMIT 50"></textarea>
+          <div class="aclist" id="soqlAc" style="display:none;"></div>
+        </div>
+        <div class="pickmeta" style="margin-top:6px;"><span class="hint" id="soqlAcHint"></span></div>
+        <div class="rowgrid" style="max-width:900px; margin-top:12px;">
+          <div>
+            <label for="soqlSaved" style="margin-top:0;">Saved queries</label>
+            <select id="soqlSaved"><option value="">No saved queries yet</option></select>
+          </div>
+          <div style="flex:0; display:flex; gap:8px; align-items:flex-end;">
+            <button class="primary" id="soqlSaveBtn" style="margin-top:0; white-space:nowrap;">Save current</button>
+            <button class="ghost" id="soqlDelBtn" style="white-space:nowrap; color:var(--muted); border-color:var(--border); background:var(--field-bg);">Delete</button>
+          </div>
+        </div>
+        <div class="pickmeta" style="margin-top:8px;">
+          Examples:
+          <a class="soqlEg" data-q="SELECT Id, Name, CreatedDate FROM Account ORDER BY CreatedDate DESC LIMIT 50">recent accounts</a> &middot;
+          <a class="soqlEg" data-q="SELECT Name, Profile.Name, LastLoginDate FROM User WHERE IsActive = true ORDER BY LastLoginDate DESC LIMIT 100">active users</a> &middot;
+          <a class="soqlEg" data-q="SELECT COUNT(Id) total, Owner.Name FROM Account GROUP BY Owner.Name ORDER BY COUNT(Id) DESC">accounts per owner</a>
+        </div>
+        <div class="optgrid" style="max-width:none;">
+          <label class="chk" for="soqlAll">
+            <input type="checkbox" id="soqlAll">
+            <span>
+              <span class="t">Fetch all pages</span>
+              <span class="s" style="display:block;">Off = first 2,000 rows. On = follow every batch.</span>
+            </span>
+          </label>
+          <label class="chk" for="soqlTooling">
+            <input type="checkbox" id="soqlTooling">
+            <span>
+              <span class="t">Use the Tooling API</span>
+              <span class="s" style="display:block;">For setup objects: ValidationRule, FlowDefinition, ApexClass metadata.</span>
+            </span>
+          </label>
+        </div>
+        <div class="btnrow" style="display:flex; gap:12px; flex-wrap:wrap;">
+          <button class="primary" id="soqlRunBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Run query
+          </button>
+          <button class="primary" id="soqlExportBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export rows
+          </button>
+        </div>
+        <div id="soqlResult" class="resultbox" style="display:none;">
+          <div class="fieldhdr" style="margin-top:4px;"><span class="pill">Rows</span><h2 id="soqlResTitle" style="font-size:15px;"></h2></div>
+          <div class="sub2" id="soqlResNote"></div>
+          <div class="accsum" id="soqlResSummary"></div>
+          <div class="tblwrap" style="max-height:420px;"><table class="tbl"><thead id="soqlResHead"></thead><tbody id="soqlResList"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- Documentation pack -->
+      <div id="panelDoc" style="display:none;">
+        <h2>Documentation pack</h2>
+        <div class="sub2">One branded document instead of seven exports: org overview and limits, the schema diagram as drawn, an object catalogue with every field, the automation that fires, and the permissions picture. Opens in a new tab, prints to PDF, and downloads as a file you can hand over or attach.</div>
+
+        <div class="rowgrid" style="margin-top:16px; align-items:flex-start;">
+          <div>
+            <label for="docTitle" style="margin-top:0;">Document title</label>
+            <input type="text" id="docTitle" placeholder="Salesforce org documentation" spellcheck="false">
+            <label for="docClient">Client or org name</label>
+            <input type="text" id="docClient" placeholder="Acme Corporation" spellcheck="false">
+          </div>
+          <div>
+            <label for="docAuthor" style="margin-top:0;">Prepared by</label>
+            <input type="text" id="docAuthor" placeholder="Your name" spellcheck="false">
+            <label for="docNote">Note on the cover <span class="hint">(optional)</span></label>
+            <input type="text" id="docNote" placeholder="Discovery phase, sandbox review" spellcheck="false">
+          </div>
+        </div>
+        <div class="pickmeta"><span class="hint" id="docBrandHint">(remembered for next time on this machine)</span></div>
+
+        <label for="docSearch">Objects for the catalogue <span class="hint">(search and tick up to 25; leave empty to skip that section)</span></label>
+        <input type="search" id="docSearch" class="searchbox" placeholder="Search objects&hellip;" spellcheck="false">
+        <div class="picklist" id="docList" style="max-width:none;"></div>
+        <div class="pickmeta" style="max-width:none;"><span id="docCount">0 selected</span> &middot; <a id="docClear">clear all</a> &middot; <a id="docFromErd">use the objects in the diagram</a></div>
+
+        <div class="optgrid" style="margin-top:14px;">
+          <label class="chk" for="docSecOverview">
+            <input type="checkbox" id="docSecOverview" checked>
+            <span><span class="t">Org overview and limits</span>
+            <span class="s" style="display:block;">Edition, instance, active users, inventory counts and anything near a ceiling.</span></span>
+          </label>
+          <label class="chk" for="docSecErd">
+            <input type="checkbox" id="docSecErd" checked>
+            <span><span class="t">Schema diagram</span>
+            <span class="s" style="display:block;">The diagram exactly as you last drew it, so arrange it there first.</span></span>
+          </label>
+          <label class="chk" for="docSecCatalogue">
+            <input type="checkbox" id="docSecCatalogue" checked>
+            <span><span class="t">Object catalogue</span>
+            <span class="s" style="display:block;">Every field of the ticked objects: type, required, unique, and what each lookup points at.</span></span>
+          </label>
+          <label class="chk" for="docSecAuto">
+            <input type="checkbox" id="docSecAuto" checked>
+            <span><span class="t">Automation inventory</span>
+            <span class="s" style="display:block;">Triggers, flows, process builders and workflow rules on those objects.</span></span>
+          </label>
+          <label class="chk" for="docSecPerms">
+            <input type="checkbox" id="docSecPerms" checked>
+            <span><span class="t">Permissions and security</span>
+            <span class="s" style="display:block;">Profiles and permission sets, who holds the permissions that bypass everything, and unused containers.</span></span>
+          </label>
+        </div>
+
+        <div class="btnrow" style="display:flex; gap:12px; flex-wrap:wrap;">
+          <button class="primary" id="docBuildBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Build document
+          </button>
+          <button class="primary" id="docWordBtn" title="Same document as a .doc file Word opens directly">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download for Word
+          </button>
+        </div>
+
+        <div id="docResult" class="resultbox" style="display:none;">
+          <div class="fieldhdr" style="margin-top:4px;"><span class="pill">Document</span><h2 id="docResTitle" style="font-size:15px;"></h2></div>
+          <div class="sub2" id="docResNote"></div>
+          <div class="accsum" id="docResSummary"></div>
+        </div>
+      </div>
+
+      <!-- Schema export -->
+      <div id="panelSchema" style="display:none;">
+        <h2>Schema export</h2>
+        <div class="sub2">One Excel workbook containing Objects, Fields, Record Types and Relationships, plus Validation Rules, Code and Picklists if you tick them.</div>
+        <div class="optgrid">
+        <label class="chk" for="customOnly">
+          <input type="checkbox" id="customOnly">
+          <span>
+            <span class="t">Only custom objects (__c)</span>
+            <span class="s" style="display:block;">Leave unchecked to export the full schema, standard + custom.</span>
+          </span>
+        </label>
+        <label class="chk" for="pickObjects">
+          <input type="checkbox" id="pickObjects">
+          <span>
+            <span class="t">Choose specific objects</span>
+            <span class="s" style="display:block;">Pick exactly which objects to export instead of everything.</span>
+          </span>
+        </label>
+        <div class="picker" id="picker">
+          <input type="search" id="pickerSearch" class="searchbox" placeholder="Filter objects&hellip;" spellcheck="false">
+          <div class="picklist" id="pickerList"></div>
+          <div class="pickmeta"><span id="pickCount">0 selected</span> &middot; <a id="pickAll">select shown</a> &middot; <a id="pickNone">clear all</a></div>
+        </div>
+        <label class="chk" for="includeVR">
+          <input type="checkbox" id="includeVR" checked>
+          <span>
+            <span class="t">Include validation rules</span>
+            <span class="s" style="display:block;">Adds a Validation Rules sheet with each rule's formula (Tooling API).</span>
+          </span>
+        </label>
+        <label class="chk" for="includeCode">
+          <input type="checkbox" id="includeCode" checked>
+          <span>
+            <span class="t">Include code inventory</span>
+            <span class="s" style="display:block;">Adds a Code sheet: Apex classes &amp; triggers, Visualforce pages, Aura and LWC bundles, with API version, namespace, size and last change.</span>
+          </span>
+        </label>
+        <label class="chk" for="includePK">
+          <input type="checkbox" id="includePK" checked>
+          <span>
+            <span class="t">Include picklist inventory</span>
+            <span class="s" style="display:block;">Adds a Picklists sheet: one row per value (label, API name, active, default), handy for integrations and migrations.</span>
+          </span>
+        </label>
+        </div>
+        <button class="primary" id="exportBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export schema
+        </button>
+      </div>
+
+      <!-- Deployment package -->
+      <div id="panelPackage" style="display:none;">
+        <h2>Deployment package</h2>
+        <div class="sub2">
+          Lists every component created or changed since a date and downloads a change-list
+          <b>Excel</b> + a ready-to-use <b>package.xml</b> (<code>sf project retrieve start -x package.xml</code>).
+          In source-tracked orgs (scratch orgs, Dev/Dev&nbsp;Pro sandboxes with tracking on) this covers
+          <b>all</b> metadata types; elsewhere it falls back to the common deployable types
+          (Apex, flows, LWC/Aura, objects, fields, rules, &hellip;).
+        </div>
+        <label for="sinceDate">Metadata changed since</label>
+        <input type="date" id="sinceDate" style="max-width:220px;">
+        <div class="pickmeta" style="margin-top:9px;">
+          Quick pick:
+          <a class="sincePick" data-days="7">last 7 days</a> &middot;
+          <a class="sincePick" data-days="30">30 days</a> &middot;
+          <a class="sincePick" data-days="90">90 days</a> &middot;
+          <a class="sincePick" data-days="180">6 months</a>
+        </div>
+        <div class="btnrow" style="display:flex; gap:12px; flex-wrap:wrap;">
+          <button class="primary" id="packageShowBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Show changes
+          </button>
+          <button class="primary" id="packageBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" y1="22" x2="12" y2="12"/></svg>
+            Export changes + package.xml
+          </button>
+        </div>
+        <div id="pkgResult" class="resultbox" style="display:none;">
+          <div class="fieldhdr" style="margin-top:4px;"><span class="pill">Changed metadata</span><h2 id="pkgResTitle" style="font-size:15px;"></h2></div>
+          <div class="sub2" id="pkgResNote"></div>
+          <div class="accsum" id="pkgResSummary"></div>
+          <div class="tblwrap" style="max-height:360px;"><table class="tbl"><thead><tr><th>Type</th><th>Metadata name</th><th>Status</th><th>Modified</th><th>By</th></tr></thead><tbody id="pkgResList"></tbody></table></div>
+        </div>
+        <div style="margin-top:26px; padding-top:22px; border-top:1px solid var(--border);">
+          <h2 style="font-size:16px;">Everything in the org</h2>
+          <div class="sub2">The manifest above is built from what REST and Tooling can see, and is driven by a date. This one asks the <b>Metadata API</b> instead, which enumerates every type the org supports, including the ones REST cannot reach: sharing rules, layout assignments, translations, custom metadata records, static resources and email templates. You get a zip holding <b>package.xml</b> and an Excel inventory of every component with its last-modified date and author. It makes dozens of calls, so allow a minute on a large org.</div>
+          <label class="chk" for="mdSkipManaged">
+            <input type="checkbox" id="mdSkipManaged" checked>
+            <span>
+              <span class="t">Leave out managed-package components</span>
+              <span class="s" style="display:block;">Components installed from AppExchange cannot be deployed from here, so they are usually noise. Untick to include them for an audit.</span>
+            </span>
+          </label>
+          <div class="btnrow" style="display:flex; gap:12px; flex-wrap:wrap;">
+            <button class="primary" id="mdAllBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
+              Export all metadata (zip)
+            </button>
+          </div>
+          <div id="mdResult" class="resultbox" style="display:none;">
+            <div class="fieldhdr" style="margin-top:4px;"><span class="pill">All metadata</span><h2 id="mdResTitle" style="font-size:15px;"></h2></div>
+            <div class="sub2" id="mdResNote"></div>
+            <div class="accsum" id="mdResSummary"></div>
+            <div class="tblwrap" style="max-height:340px;"><table class="tbl"><thead><tr><th>Type</th><th>Components</th></tr></thead><tbody id="mdResList"></tbody></table></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Setup audit trail -->
+      <div id="panelAudit" style="display:none;">
+        <h2>Setup audit trail</h2>
+        <div class="sub2">Who changed what in Setup, and when. This answers the &ldquo;who touched this yesterday?&rdquo; question. Salesforce keeps roughly six months of entries (or 180 days, whichever your org retains).</div>
+        <div class="rowgrid" style="max-width:none;">
+          <div>
+            <label for="auditSince" style="margin-top:0;">Since</label>
+            <input type="date" id="auditSince">
+          </div>
+          <div>
+            <label for="auditUser" style="margin-top:0;">User contains <span class="hint">(optional)</span></label>
+            <input type="search" id="auditUser" class="searchbox" placeholder="name or username&hellip;" spellcheck="false">
+          </div>
+          <div>
+            <label for="auditText" style="margin-top:0;">Action contains <span class="hint">(optional)</span></label>
+            <input type="search" id="auditText" class="searchbox" placeholder="e.g. profile, deleted, field&hellip;" spellcheck="false">
+          </div>
+        </div>
+        <div class="pickmeta" style="margin-top:9px;">
+          Quick pick:
+          <a class="auditPick" data-days="1">yesterday</a> &middot;
+          <a class="auditPick" data-days="7">last 7 days</a> &middot;
+          <a class="auditPick" data-days="30">30 days</a> &middot;
+          <a class="auditPick" data-days="90">90 days</a>
+        </div>
+        <div class="btnrow" style="display:flex; gap:12px; flex-wrap:wrap;">
+          <button class="primary" id="auditShowBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Show changes
+          </button>
+          <button class="primary" id="auditExportBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export changes
+          </button>
+        </div>
+        <div id="auditResult" class="resultbox" style="display:none;">
+          <div class="fieldhdr" style="margin-top:4px;"><span class="pill">Setup changes</span><h2 id="auditResTitle" style="font-size:15px;"></h2></div>
+          <div class="sub2" id="auditResNote"></div>
+          <div class="accsum" id="auditResSummary"></div>
+          <div class="tblwrap" style="max-height:420px;"><table class="tbl"><thead><tr><th>When</th><th>Who</th><th>Section</th><th>What changed</th></tr></thead><tbody id="auditResList"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- Tests & coverage -->
+      <div id="panelTests" style="display:none;">
+        <h2>Tests &amp; coverage</h2>
+        <div class="sub2">Apex code coverage per class and the most recent test failures. Coverage figures come from the last test run in this org, so if they look stale, run your tests and refresh.</div>
+        <div class="optgrid" style="max-width:none;">
+          <label class="chk" for="testsBelow">
+            <input type="checkbox" id="testsBelow">
+            <span>
+              <span class="t">Only classes below 75%</span>
+              <span class="s" style="display:block;">The deployment threshold, so this is your blocker list.</span>
+            </span>
+          </label>
+          <label class="chk" for="testsFails">
+            <input type="checkbox" id="testsFails" checked>
+            <span>
+              <span class="t">Include recent test failures</span>
+              <span class="s" style="display:block;">Latest failed methods with their error message.</span>
+            </span>
+          </label>
+        </div>
+        <div class="btnrow" style="display:flex; gap:12px; flex-wrap:wrap;">
+          <button class="primary" id="testsShowBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Show coverage
+          </button>
+          <button class="primary" id="testsExportBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export coverage
+          </button>
+        </div>
+        <div id="testsResult" class="resultbox" style="display:none;">
+          <div class="fieldhdr" style="margin-top:4px;"><span class="pill">Coverage</span><h2 id="testsResTitle" style="font-size:15px;"></h2></div>
+          <div class="sub2" id="testsResNote"></div>
+          <div class="accsum" id="testsResSummary"></div>
+          <div class="tblwrap" style="max-height:400px;"><table class="tbl"><thead><tr><th>Class / trigger</th><th>Covered</th><th>Uncovered</th><th>Coverage</th><th>Mainly covered by</th><th>Status</th></tr></thead><tbody id="testsResList"></tbody></table></div>
+          <div id="testsFailBox" style="display:none; margin-top:14px;">
+            <div class="fieldhdr"><span class="pill">Recent failures</span><h2 style="font-size:14px;" id="testsFailTitle"></h2></div>
+            <div class="tblwrap" style="max-height:260px;"><table class="tbl"><thead><tr><th>Test class</th><th>Method</th><th>Message</th><th>When</th></tr></thead><tbody id="testsFailList"></tbody></table></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Record counts -->
+      <div id="panelCounts" style="display:none;">
+        <h2>Record counts</h2>
+        <div class="sub2">How many records each object holds, for migration sizing, sandbox planning, and spotting objects that are configured but never used.</div>
+        <div class="optgrid" style="max-width:none;">
+          <label class="chk" for="countsCustom">
+            <input type="checkbox" id="countsCustom" checked>
+            <span>
+              <span class="t">Custom objects only (__c)</span>
+              <span class="s" style="display:block;">Unchecked = every countable object, which takes longer.</span>
+            </span>
+          </label>
+          <label class="chk" for="countsEmpty">
+            <input type="checkbox" id="countsEmpty" checked>
+            <span>
+              <span class="t">Flag empty objects</span>
+              <span class="s" style="display:block;">Zero records: configured but unused.</span>
+            </span>
+          </label>
+        </div>
+        <div class="btnrow" style="display:flex; gap:12px; flex-wrap:wrap;">
+          <button class="primary" id="countsShowBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Show counts
+          </button>
+          <button class="primary" id="countsExportBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export counts
+          </button>
+        </div>
+        <div id="countsResult" class="resultbox" style="display:none;">
+          <div class="fieldhdr" style="margin-top:4px;"><span class="pill">Record counts</span><h2 id="countsResTitle" style="font-size:15px;"></h2></div>
+          <div class="sub2" id="countsResNote"></div>
+          <div class="accsum" id="countsResSummary"></div>
+          <div class="tblwrap" style="max-height:420px;"><table class="tbl"><thead><tr><th>Object</th><th>API name</th><th>Records</th><th>Note</th></tr></thead><tbody id="countsResList"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- Scheduled & failed jobs -->
+      <div id="panelJobs" style="display:none;">
+        <h2>Scheduled &amp; failed jobs</h2>
+        <div class="sub2">What is scheduled to run, and what failed recently. This is the morning check after an overnight batch. Covers scheduled Apex, queueable and batch jobs, and future methods.</div>
+        <div class="rowgrid" style="max-width:none;">
+          <div>
+            <label for="jobsDays" style="margin-top:0;">Failures within</label>
+            <select id="jobsDays">
+              <option value="1">last 24 hours</option>
+              <option value="3" selected>last 3 days</option>
+              <option value="7">last 7 days</option>
+              <option value="30">last 30 days</option>
+            </select>
+          </div>
+        </div>
+        <div class="btnrow" style="display:flex; gap:12px; flex-wrap:wrap;">
+          <button class="primary" id="jobsShowBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Show jobs
+          </button>
+          <button class="primary" id="jobsExportBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export jobs
+          </button>
+        </div>
+        <div id="jobsResult" class="resultbox" style="display:none;">
+          <div class="fieldhdr" style="margin-top:4px;"><span class="pill">Jobs</span><h2 id="jobsResTitle" style="font-size:15px;"></h2></div>
+          <div class="sub2" id="jobsResNote"></div>
+          <div class="accsum" id="jobsResSummary"></div>
+          <div class="fieldhdr" style="margin-top:14px;"><span class="pill">Scheduled</span><h2 style="font-size:14px;" id="jobsSchedTitle"></h2></div>
+          <div class="tblwrap" style="max-height:260px;"><table class="tbl"><thead><tr><th>Job</th><th>Type</th><th>State</th><th>Next run</th><th>Previous run</th><th>Owner</th></tr></thead><tbody id="jobsSchedList"></tbody></table></div>
+          <div class="fieldhdr" style="margin-top:16px;"><span class="pill">Recent failures</span><h2 style="font-size:14px;" id="jobsFailTitle"></h2></div>
+          <div class="tblwrap" style="max-height:300px;"><table class="tbl"><thead><tr><th>What ran</th><th>Type</th><th>Status</th><th>Errors</th><th>Message</th><th>When</th></tr></thead><tbody id="jobsFailList"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- Org compare -->
+      <div id="panelCompare" style="display:none;">
+        <h2>Org compare</h2>
+        <div class="sub2">Line up the org you are in against one or more other orgs you are logged into. With one other org you get the detailed A vs B diff (objects, fields, validation rules). Add more and you get a matrix instead: every component found in <b>any</b> of them, a column per org, and what differs. Sandbox vs production before a deployment is the classic use.</div>
+        <div id="mxSlots"></div>
+        <div class="pickmeta">
+          <a id="mxAdd">+ Add another org</a> &nbsp;
+          <a id="mxRefresh">Refresh org list</a>
+          <span class="hint" id="mxSlotHint"></span>
+        </div>
+        <label for="mxScope">Include in the matrix <span class="hint">(three or more orgs)</span></label>
+        <select id="mxScope" style="max-width:420px;">
+          <option value="components" selected>Code, automation, permissions, other metadata</option>
+          <option value="objects">Also objects (presence only, fast)</option>
+        </select>
+        <label class="chk" for="cmpCustomOnly">
+          <input type="checkbox" id="cmpCustomOnly" checked>
+          <span>
+            <span class="t">Compare custom objects only (__c)</span>
+            <span class="s" style="display:block;">Recommended: comparing every standard object doubles the runtime. Applies to the two-org diff.</span>
+          </span>
+        </label>
+        <label class="chk" for="orgDiffOnly">
+          <input type="checkbox" id="orgDiffOnly" checked>
+          <span>
+            <span class="t">Differences only</span>
+            <span class="s" style="display:block;">Unchecked lists every component from every org, marked Same / Differs / Only in one. Much bigger file.</span>
+          </span>
+        </label>
+        <div class="btnrow" style="display:flex; gap:12px; flex-wrap:wrap;">
+          <button class="primary" id="cmpShowBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <span id="cmpShowLabel">Show summary</span>
+          </button>
+          <button class="primary" id="cmpExportBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span id="cmpExportLabel">Export org diff</span>
+          </button>
+        </div>
+        <div id="orgResult" class="resultbox" style="display:none;">
+          <div class="fieldhdr" style="margin-top:4px;"><span class="pill">Org diff</span><h2 id="orgResTitle" style="font-size:15px;"></h2></div>
+          <div class="sub2" id="orgResNote"></div>
+          <div class="accsum" id="orgResSummary"></div>
+          <div class="tblwrap" style="max-height:340px;"><table class="tbl"><thead><tr><th>Area</th><th>Type</th><th>Only in A</th><th>Only in B</th><th>Differs</th></tr></thead><tbody id="orgResList"></tbody></table></div>
+        </div>
+        <div id="mxResult" class="resultbox" style="display:none;">
+          <div class="fieldhdr" style="margin-top:4px;"><span class="pill">Matrix</span><h2 id="mxResTitle" style="font-size:15px;"></h2></div>
+          <div class="sub2" id="mxResNote"></div>
+          <div class="accsum" id="mxResSummary"></div>
+          <input type="search" id="mxFilter" class="searchbox" placeholder="Filter this matrix&hellip;" spellcheck="false" style="margin-top:12px;">
+          <div class="tblwrap" style="max-height:440px;"><table class="tbl"><thead id="mxHead"></thead><tbody id="mxBody"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- Sharing model -->
+      <div id="panelSharing" style="display:none;">
+        <h2>Sharing model</h2>
+        <div class="sub2">Which <b>records</b> a user can see, as opposed to which objects and fields. Three parts: the org-wide default on every object with how many sharing rules widen it, the role hierarchy with a headcount per role, and the public groups and queues. The baseline plus the hierarchy is what an architect asks for first on an unfamiliar org.</div>
+        <label class="chk" for="shRules" style="max-width:none;">
+          <input type="checkbox" id="shRules" checked>
+          <span>
+            <span class="t">Count sharing rules per object</span>
+            <span class="s" style="display:block;">Asks the Metadata API for rule names, which takes a few extra seconds. Untick for just the defaults and the hierarchy.</span>
+          </span>
+        </label>
+        <div class="btnrow" style="display:flex; gap:12px; flex-wrap:wrap;">
+          <button class="primary" id="shShowBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Show sharing model
+          </button>
+          <button class="primary" id="shExportBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export sharing model
+          </button>
+        </div>
+        <div id="shResult" class="resultbox" style="display:none;">
+          <div class="fieldhdr" style="margin-top:4px;"><span class="pill">Sharing</span><h2 id="shResTitle" style="font-size:15px;"></h2></div>
+          <div class="sub2" id="shResNote"></div>
+          <div class="accsum" id="shResSummary"></div>
+
+          <div class="fieldhdr" style="margin-top:16px;"><span class="pill">Org-wide defaults</span><h2 style="font-size:14px;" id="shOwdTitle"></h2></div>
+          <input type="search" id="shFilter" class="searchbox" placeholder="Filter objects&hellip;" spellcheck="false" style="margin-top:10px; max-width:460px;">
+          <label class="chk" for="shOpenOnly" style="max-width:none;">
+            <input type="checkbox" id="shOpenOnly">
+            <span><span class="t">Only objects that are not Private</span>
+            <span class="s" style="display:block;">The wide-open ones are usually what a review is looking for.</span></span>
+          </label>
+          <div class="tblwrap" style="max-height:360px;"><table class="tbl"><thead><tr><th>Object</th><th>API name</th><th>Internal default</th><th>External default</th><th>Sharing rules</th></tr></thead><tbody id="shOwdList"></tbody></table></div>
+
+          <div class="fieldhdr" style="margin-top:18px;"><span class="pill">Role hierarchy</span><h2 style="font-size:14px;" id="shRoleTitle"></h2></div>
+          <div class="tblwrap" style="max-height:320px;"><table class="tbl"><thead><tr><th>Role</th><th>API name</th><th>Depth</th><th>Active users</th></tr></thead><tbody id="shRoleList"></tbody></table></div>
+
+          <div class="fieldhdr" style="margin-top:22px;"><span class="pill">How access is granted</span><h2 style="font-size:14px;" id="shGrantTitle"></h2></div>
+          <div class="sub2">The blocks above are the configured baseline. This one is what is actually granting access today: the reasons Apex can cite, the newer restriction and scoping rules, and, per object, a count of real share rows split by cause.</div>
+          <div class="tblwrap" style="max-height:260px;"><table class="tbl"><thead><tr><th>Kind</th><th>Object</th><th>Name</th></tr></thead><tbody id="shReasonList"></tbody></table></div>
+
+          <label for="shShareSearch" style="margin-top:16px;">Count share rows for <span class="hint">(tick up to 10 objects; share objects only exist where the default is not Public Read/Write)</span></label>
+          <input type="search" id="shShareSearch" class="searchbox" placeholder="Search objects&hellip;" spellcheck="false" style="max-width:460px;">
+          <div class="picklist" id="shShareList" style="max-width:none; max-height:200px;"></div>
+          <div class="pickmeta" style="max-width:none;"><span id="shShareCount">0 selected</span> &middot; <a id="shShareClear">clear all</a> &middot; <a id="shShareFromRules">use the objects that have sharing rules</a></div>
+          <div class="btnrow" style="display:flex; gap:12px; flex-wrap:wrap;">
+            <button class="primary" id="shRowsBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+              Count share rows
+            </button>
+            <button class="primary" id="shApexBtn" title="Search Apex source for inserts into share objects">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+              Find Apex sharing
+            </button>
+          </div>
+          <div class="tblwrap" style="max-height:320px;"><table class="tbl"><thead><tr><th>Object</th><th>Granted by</th><th>Rows</th></tr></thead><tbody id="shRowsList"></tbody></table></div>
+          <div id="shApexBox" style="display:none;">
+            <div class="fieldhdr" style="margin-top:16px;"><span class="pill">Apex sharing</span><h2 style="font-size:14px;" id="shApexTitle"></h2></div>
+            <div class="sub2" id="shApexNote"></div>
+            <div class="tblwrap" style="max-height:280px;"><table class="tbl"><thead><tr><th>Class</th><th>Share object</th><th>Line</th><th>Code</th></tr></thead><tbody id="shApexList"></tbody></table></div>
+          </div>
+
+          <div class="fieldhdr" style="margin-top:18px;"><span class="pill">Groups and queues</span><h2 style="font-size:14px;" id="shGroupTitle"></h2></div>
+          <div class="tblwrap" style="max-height:300px;"><table class="tbl"><thead><tr><th>Name</th><th>API name</th><th>Kind</th><th>Members</th></tr></thead><tbody id="shGroupList"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- Security posture -->
+      <div id="panelSecurity" style="display:none;">
+        <h2>Security posture</h2>
+        <div class="sub2">Who holds the permissions that bypass everything else, and which containers nobody uses. Four questions in one pass: who can Modify All Data, View All Data, Author Apex or Manage Users; how many active admins there are; which permission sets have no assignees; and which profiles have no active users.</div>
+        <label class="chk" for="secActiveOnly" style="max-width:none;">
+          <input type="checkbox" id="secActiveOnly" checked>
+          <span>
+            <span class="t">Active users only</span>
+            <span class="s" style="display:block;">Unchecked also counts frozen and inactive users, which is the stricter read for an audit.</span>
+          </span>
+        </label>
+        <div class="btnrow" style="display:flex; gap:12px; flex-wrap:wrap;">
+          <button class="primary" id="secShowBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Show posture
+          </button>
+          <button class="primary" id="secExportBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export posture
+          </button>
+        </div>
+        <div id="secResult" class="resultbox" style="display:none;">
+          <div class="fieldhdr" style="margin-top:4px;"><span class="pill">Posture</span><h2 id="secResTitle" style="font-size:15px;"></h2></div>
+          <div class="sub2" id="secResNote"></div>
+          <div class="accsum" id="secResSummary"></div>
+          <div class="fieldhdr" style="margin-top:16px;"><span class="pill">Elevated access</span><h2 style="font-size:14px;" id="secElevTitle"></h2></div>
+          <input type="search" id="secFilter" class="searchbox" placeholder="Filter people&hellip;" spellcheck="false" style="margin-top:10px; max-width:460px;">
+          <div class="tblwrap" style="max-height:330px;"><table class="tbl"><thead><tr><th>User</th><th>Username</th><th>Profile</th><th>Active</th><th>Permission</th><th>Granted via</th></tr></thead><tbody id="secElevList"></tbody></table></div>
+          <div class="fieldhdr" style="margin-top:18px;"><span class="pill">Unused</span><h2 style="font-size:14px;" id="secUnusedTitle"></h2></div>
+          <div class="tblwrap" style="max-height:300px;"><table class="tbl"><thead><tr><th>Type</th><th>Name</th><th>Note</th></tr></thead><tbody id="secUnusedList"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- Permissions matrix -->
+      <div id="panelPerms" style="display:none;">
+        <h2>Permissions matrix</h2>
+        <div class="sub2">Object CRUD and field-level security per profile / permission set for the objects you list. Three sheets: Object CRUD, FLS (flat list), FLS Matrix (fields &times; profiles).</div>
+        <label for="permSearch">Objects <span class="hint">(search and tick up to 20)</span></label>
+        <input type="search" id="permSearch" class="searchbox" placeholder="Search objects&hellip;" spellcheck="false" style="max-width:560px;">
+        <div class="picklist" id="permList" style="max-width:none;"></div>
+        <div class="pickmeta" style="max-width:none;"><span id="permCount">0 selected</span> &middot; <a id="permClear">clear all</a></div>
+        <label class="chk" for="permIncludePS">
+          <input type="checkbox" id="permIncludePS" checked>
+          <span>
+            <span class="t">Include permission sets</span>
+            <span class="s" style="display:block;">Unchecked = profiles only.</span>
+          </span>
+        </label>
+        <div class="btnrow" style="display:flex; gap:12px; flex-wrap:wrap;">
+          <button class="primary" id="permsShowBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Show access
+          </button>
+          <button class="primary" id="permsBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export access
+          </button>
+        </div>
+        <div id="permResult" style="display:none;">
+          <div class="fieldhdr" style="margin-top:4px;"><span class="pill">Object access</span><h2 id="permResTitle" style="font-size:15px;"></h2></div>
+          <div class="sub2" id="permResNote"></div>
+          <div class="accsum" id="permResSummary"></div>
+          <div class="tblwrap" style="max-height:340px;"><table class="tbl"><thead><tr><th>Object</th><th>Profile / Permission Set</th><th>Type</th><th>Read</th><th>Create</th><th>Edit</th><th>Delete</th><th>View All</th><th>Modify All</th></tr></thead><tbody id="permResList"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- Automation inventory -->
+      <div id="panelAuto" style="display:none;">
+        <h2>Automation inventory</h2>
+        <div class="sub2">Everything that fires on record changes: Apex triggers (with events), record-triggered flows, process builders, workflow rules and autolaunched or screen flows, in one filterable sheet.</div>
+        <label for="autoSearch">Filter to objects <span class="hint">(optional; tick none to cover the whole org)</span></label>
+        <input type="search" id="autoSearch" class="searchbox" placeholder="Search objects&hellip;" spellcheck="false" style="max-width:560px;">
+        <div class="picklist" id="autoList" style="max-width:none;"></div>
+        <div class="pickmeta" style="max-width:none;"><span id="autoCount">0 selected (whole org)</span> &middot; <a id="autoClear">clear all</a></div>
+        <div class="btnrow" style="display:flex; gap:12px; flex-wrap:wrap;">
+          <button class="primary" id="autoShowBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Show automation
+          </button>
+          <button class="primary" id="autoBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export automation
+          </button>
+        </div>
+        <div id="autoResult" style="display:none;">
+          <div class="fieldhdr" style="margin-top:4px;"><span class="pill">Automation</span><h2 id="autoResTitle" style="font-size:15px;"></h2></div>
+          <div class="sub2" id="autoResNote"></div>
+          <div class="accsum" id="autoResSummary"></div>
+          <div class="tblwrap" style="max-height:360px;"><table class="tbl"><thead><tr><th>Object</th><th>Type</th><th>Name</th><th>Active</th><th>Events / Trigger</th></tr></thead><tbody id="autoResList"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- Dependencies -->
+      <div id="panelDeps" style="display:none;">
+        <h2>Where is it used?</h2>
+        <div class="sub2">Finds components that reference the one you name (flows, Apex, layouts, formulas&hellip;) via Salesforce's dependency API. <b>Note:</b> the API is beta, so coverage isn't 100% and some orgs don't have it enabled.</div>
+        <label for="depType">Component type</label>
+        <select id="depType" style="max-width:320px;">
+          <option value="CustomField">Custom field</option>
+          <option value="CustomObject">Custom object</option>
+          <option value="ApexClass">Apex class</option>
+          <option value="ApexPage">Visualforce page</option>
+          <option value="ApexComponent">Visualforce component</option>
+          <option value="LightningComponentBundle">Lightning web component</option>
+          <option value="AuraDefinitionBundle">Aura component</option>
+          <option value="Flow">Flow / process</option>
+          <option value="CustomLabel">Custom label</option>
+          <option value="StaticResource">Static resource</option>
+          <option value="PermissionSet">Permission set</option>
+          <option value="CustomPermission">Custom permission</option>
+          <option value="GlobalValueSet">Global value set</option>
+          <option value="RecordType">Record type</option>
+          <option value="QuickAction">Quick action</option>
+        </select>
+        <div id="depObjWrap" style="display:none;">
+          <label for="depObj">Object</label>
+          <div class="rowgrid" style="max-width:none;">
+            <div><input type="search" id="depObjFilter" class="searchbox" placeholder="Filter objects&hellip;" spellcheck="false"></div>
+            <div><select id="depObj"></select></div>
+          </div>
+        </div>
+        <label for="depItem" id="depItemLabel">Component</label>
+        <div class="rowgrid" style="max-width:none;">
+          <div><input type="search" id="depFilter" class="searchbox" placeholder="Filter the list&hellip;" spellcheck="false"></div>
+          <div><select id="depItem"></select></div>
+        </div>
+        <div class="pickmeta"><a id="depReload">Reload list</a> <span class="hint" id="depHint">(pick from the org instead of typing)</span><span class="hint"> &middot; triggers, validation rules and layouts are not listed: nothing references them, so the answer was always empty. To see what one of those <i>touches</i>, read it in <b>Code search</b> or export its formula with <b>Schema export</b>.</span></div>
+        <div class="btnrow" style="display:flex; gap:12px; flex-wrap:wrap;">
+          <button class="primary" id="depsShowBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Show usages
+          </button>
+          <button class="primary" id="depsBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export usages
+          </button>
+        </div>
+        <div id="depsResult" class="resultbox" style="display:none;">
+          <div class="fieldhdr" style="margin-top:4px;"><span class="pill">Usages</span><h2 id="depsResTitle" style="font-size:15px;"></h2></div>
+          <div class="sub2" id="depsResNote"></div>
+          <div class="accsum" id="depsResSummary"></div>
+          <div class="tblwrap" style="max-height:360px;"><table class="tbl"><thead><tr><th>Used by</th><th>Type</th></tr></thead><tbody id="depsResList"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- Field usage -->
+      <div id="panelUsage" style="display:none;">
+        <h2>Field usage</h2>
+        <div class="sub2">How many records actually have a value in each field. <b>Unused fields</b> goes further: it also checks metadata references (layouts, flows, Apex, formulas, reports) and flags fields that are empty <i>and</i> unreferenced, which are the real cleanup candidates. Aggregate queries are heavy, so keep the selection small.</div>
+        <label for="usageSearch">Objects <span class="hint">(search and tick up to 10)</span></label>
+        <input type="search" id="usageSearch" class="searchbox" placeholder="Search objects&hellip;" spellcheck="false" style="max-width:560px;">
+        <div class="picklist" id="usageList" style="max-width:none;"></div>
+        <div class="pickmeta" style="max-width:none;"><span id="usageCount">0 selected</span> &middot; <a id="usageClear">clear all</a></div>
+        <label class="chk" for="unusedCustomOnly">
+          <input type="checkbox" id="unusedCustomOnly" checked>
+          <span>
+            <span class="t">Custom fields only (__c) when finding unused fields</span>
+            <span class="s" style="display:block;">Standard fields cannot be deleted, so they are usually noise in a cleanup list.</span>
+          </span>
+        </label>
+        <div class="btnrow" style="display:flex; gap:12px; flex-wrap:wrap;">
+          <button class="primary" id="usageShowBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Show usage
+          </button>
+          <button class="primary" id="usageBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export usage
+          </button>
+          <button class="primary" id="unusedBtn" title="Fields with no data and no metadata references: cleanup candidates">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+            Find unused fields
+          </button>
+        </div>
+        <div id="unusedResult" class="resultbox" style="display:none;">
+          <div class="fieldhdr" style="margin-top:4px;"><span class="pill">Cleanup candidates</span><h2 id="unusedResTitle" style="font-size:15px;"></h2></div>
+          <div class="sub2" id="unusedResNote"></div>
+          <div class="accsum" id="unusedResSummary"></div>
+          <div class="tblwrap" style="max-height:380px;"><table class="tbl"><thead><tr><th>Object</th><th>Field</th><th>Type</th><th>Records with value</th><th>References</th><th>Referenced by</th><th>Verdict</th></tr></thead><tbody id="unusedResList"></tbody></table></div>
+        </div>
+        <div id="usageResult" class="resultbox" style="display:none;">
+          <div class="fieldhdr" style="margin-top:4px;"><span class="pill">Field usage</span><h2 id="usageResTitle" style="font-size:15px;"></h2></div>
+          <div class="sub2" id="usageResNote"></div>
+          <div class="accsum" id="usageResSummary"></div>
+          <div class="tblwrap" style="max-height:360px;"><table class="tbl"><thead><tr><th>Object</th><th>Field</th><th>Type</th><th>With value</th><th>Total</th><th>% populated</th><th>Unused?</th></tr></thead><tbody id="usageResList"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- Object browser -->
+      <div id="panelBrowser" style="display:none;">
+        <h2>Object browser</h2>
+        <div class="sub2">Browse any object's fields right here, no download needed. Click an object, search its fields.</div>
+        <div id="bObjView">
+          <input type="search" id="bSearch" class="searchbox" placeholder="Search objects&hellip;" spellcheck="false" style="margin-top:14px;">
+          <div class="tblwrap"><table class="tbl"><thead><tr><th>Object</th><th>API Name</th><th>Custom</th></tr></thead><tbody id="bObjList"></tbody></table></div>
+        </div>
+        <div id="bFieldView" style="display:none;">
+          <span class="crumb" id="bBack">&larr; All objects</span>
+          <h2 id="bObjTitle" style="margin-top:8px;"></h2>
+          <div class="facts" id="bOwdFacts" style="display:none;"></div>
+          <div class="sub2">Click a field to see its access per profile / permission set.</div>
+          <div class="rowgrid" style="margin-top:12px;">
+            <div><input type="search" id="bFieldSearch" class="searchbox" placeholder="Search fields&hellip;" spellcheck="false"></div>
+            <div style="flex:0;"><button class="primary" id="bRTBtn" style="margin-top:0; white-space:nowrap;">Show record types</button></div>
+          </div>
+          <div class="tblwrap"><table class="tbl"><thead><tr><th>Label</th><th>API Name</th><th>Type</th><th>Required</th><th>Details</th></tr></thead><tbody id="bFieldList"></tbody></table></div>
+          <div id="bRTInline" style="display:none;">
+            <div class="fieldhdr"><span class="pill">Record types</span><h2 id="bRTTitle" style="font-size:15px;"></h2></div>
+            <div class="sub2" id="bRTNote"></div>
+            <div class="tblwrap" style="max-height:300px;"><table class="tbl"><thead><tr><th>Record Type</th><th>Profile / Permission Set</th><th>Type</th><th>Available</th><th>Default</th></tr></thead><tbody id="bRTList"></tbody></table></div>
+          </div>
+          <div id="bFLSInline" style="display:none;">
+            <div class="fieldhdr"><span class="pill">Field access</span><h2 id="bFLSTitle" style="font-size:15px;"></h2></div>
+            <div class="sub2" id="bFLSNote"></div>
+            <div class="accsum" id="bFLSSummary"></div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
+              <button class="primary" id="bRefsBtn" style="margin-top:0;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M8.5 8.5 15.5 15.5"/></svg>
+                Where is it used?
+              </button>
+              <button class="primary" id="bFieldSetupBtn" style="margin-top:0;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                Open field in Setup
+              </button>
+            </div>
+            <div id="bRefsBox" style="display:none; margin-top:14px;">
+              <div class="sub2" id="bRefsNote"></div>
+              <div class="accsum" id="bRefsSummary"></div>
+              <div class="tblwrap" style="max-height:260px;"><table class="tbl"><thead><tr><th>Used by</th><th>Type</th></tr></thead><tbody id="bRefsList"></tbody></table></div>
+            </div>
+            <div class="tblwrap" style="max-height:300px;"><table class="tbl"><thead><tr><th>Profile / Permission Set</th><th>Type</th><th>Access</th></tr></thead><tbody id="bFLSList"></tbody></table></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- User effective access -->
+      <div id="panelUserAccess" style="display:none;">
+        <h2>User access</h2>
+        <div class="sub2">What can this person <i>actually</i> do? Their profile plus every assigned permission set, merged into one effective-access workbook, with a &ldquo;granted via&rdquo; column showing where each right comes from.</div>
+        <label for="uaSearch">Find user <span class="hint">(name or username)</span></label>
+        <div class="rowgrid" style="max-width:none;">
+          <div><input type="search" id="uaSearch" class="searchbox" placeholder="Search by name or username&hellip;" spellcheck="false"></div>
+          <div style="flex:0;"><button class="primary" id="uaFindBtn" style="margin-top:0; white-space:nowrap;">Search</button></div>
+        </div>
+        <div id="uaResults" style="display:none;">
+          <label for="uaUser">User</label>
+          <select id="uaUser"></select>
+          <div class="btnrow" style="display:flex; gap:12px; flex-wrap:wrap;">
+            <button class="primary" id="uaShowBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              Show access
+            </button>
+            <button class="primary" id="uaExportBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Export access
+            </button>
+          </div>
+          <div id="uaResult" class="resultbox" style="display:none;">
+            <div class="fieldhdr" style="margin-top:4px;"><span class="pill">Effective access</span><h2 id="uaResTitle" style="font-size:15px;"></h2></div>
+            <div class="sub2" id="uaResNote"></div>
+            <div class="accsum" id="uaResSummary"></div>
+            <input type="search" id="uaResFilter" class="searchbox" placeholder="Filter this list&hellip;" spellcheck="false" style="margin-top:12px; max-width:560px;">
+            <div class="tblwrap" style="max-height:400px;"><table class="tbl"><thead><tr><th>Area</th><th>Item</th><th>Access</th><th>Granted via</th></tr></thead><tbody id="uaResList"></tbody></table></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Profile / permission set compare -->
+      <div id="panelProfCmp" style="display:none;">
+        <h2>Profile &amp; permission set compare</h2>
+        <div class="sub2">Compare profiles or permission sets, in one org or across orgs. Two sides give you the detailed A vs B comparison: object CRUD, field-level security, system permissions, Apex/VF/custom-permission access and tab visibility. Add a third org or more and you get a matrix of the same permissions with a column per side.</div>
+
+        <label for="cmpKind">Compare</label>
+        <select id="cmpKind" style="max-width:260px;">
+          <option value="profile">Profiles</option>
+          <option value="permset">Permission sets</option>
+        </select>
+
+        <div id="profSlots"></div>
+        <div class="pickmeta" style="margin-top:10px;">
+          <a id="profAdd">+ Add another org</a> &nbsp;
+          <a id="profReload">Reload lists</a>
+          <span class="hint" id="profOrgHint"></span>
+        </div>
+
+        <label class="chk" for="profDiffOnly" style="max-width:none;">
+          <input type="checkbox" id="profDiffOnly" checked>
+          <span>
+            <span class="t">Differences only</span>
+            <span class="s" style="display:block;">Unchecked = every permission from both sides, with a Same/Differs column. Much bigger file.</span>
+          </span>
+        </label>
+        <div class="btnrow" style="display:flex; gap:12px; flex-wrap:wrap;">
+          <button class="primary" id="profShowBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <span id="profShowLabel">Show comparison</span>
+          </button>
+          <button class="primary" id="profCmpBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span id="profExportLabel">Export comparison</span>
+          </button>
+        </div>
+        <div id="pmxResult" class="resultbox" style="display:none;">
+          <div class="fieldhdr" style="margin-top:4px;"><span class="pill">Matrix</span><h2 id="pmxResTitle" style="font-size:15px;"></h2></div>
+          <div class="sub2" id="pmxResNote"></div>
+          <div class="accsum" id="pmxResSummary"></div>
+          <div class="tblwrap" style="max-height:440px;"><table class="tbl"><thead id="pmxHead"></thead><tbody id="pmxBody"></tbody></table></div>
+        </div>
+        <div id="profResult" class="resultbox" style="display:none;">
+          <div class="fieldhdr" style="margin-top:4px;"><span class="pill">Comparison</span><h2 id="profResTitle" style="font-size:15px;"></h2></div>
+          <div class="sub2" id="profResNote"></div>
+          <div class="accsum" id="profResSummary"></div>
+          <div class="tblwrap" style="max-height:400px;"><table class="tbl"><thead><tr><th>Area</th><th>Item</th><th id="profResColA">Side A</th><th id="profResColB">Side B</th><th>Result</th></tr></thead><tbody id="profResList"></tbody></table></div>
+        </div>
+      </div>
+
+      <div class="bar" id="bar"><div id="barFill"></div></div>
+      <div class="status" id="status"><span class="spinner"></span><span id="statusText"></span></div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="covOverlay">
+  <div class="modal">
+    <div class="mhead"><h3 id="covTitle">Covering tests</h3><button class="mclose" id="covClose">&times;</button></div>
+    <div class="mbody">
+      <div class="sub2" id="covNote" style="padding: 4px 12px 8px;"></div>
+      <table class="tbl"><thead><tr><th>Test class</th><th>Lines it covers</th><th>Share</th></tr></thead><tbody id="covList"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="pkOverlay">
+  <div class="modal">
+    <div class="mhead"><h3 id="pkTitle">Picklist values</h3><button class="mclose" id="pkClose">&times;</button></div>
+    <div class="mbody"><table class="tbl"><thead><tr><th>Value (API)</th><th>Label</th><th>Active</th><th>Default</th></tr></thead><tbody id="pkList"></tbody></table></div>
+  </div>
+</div>
+
+<div class="page-foot">Org Lens &middot; built by <a href="https://www.linkedin.com/in/dinesh-kumar-kothuru/" target="_blank" rel="noopener">Dinesh Kothuru</a> &middot; <a href="https://github.com/dineshkothuru/org-lens" target="_blank" rel="noopener">GitHub</a> &middot; <span id="verStamp"></span></div>
+
+<script src="app.js"></script>
+</body>
+</html>

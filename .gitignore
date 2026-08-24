@@ -1,0 +1,5 @@
+# local test harness and build output, not part of the extension
+_test.html
+*.zip
+.DS_Store
+Thumbs.db

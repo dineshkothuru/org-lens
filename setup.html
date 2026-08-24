@@ -1,0 +1,453 @@
+<title>Org Lens Setup</title>
+<style>
+  /* ---- tokens: light is the base, both dark states redefine only these ---- */
+  :root {
+    --paper: #f6f8fb;
+    --card: #ffffff;
+    --ink: #101a2b;
+    --ink-soft: #48566b;
+    --ink-faint: #78889f;
+    --rule: #e2e8f1;
+    --accent: #0b5cab;
+    --accent-bright: #0176d3;
+    --accent-wash: #eaf3fc;
+    --ok: #216e42;
+    --ok-wash: #e8f5ed;
+    --warn: #8a5514;
+    --warn-wash: #fdf3e5;
+    --code-bg: #eef2f8;
+    --shadow: 0 1px 2px rgba(16,26,43,.06), 0 12px 28px -20px rgba(16,26,43,.4);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #0b1220;
+      --card: #131c2c;
+      --ink: #e8eef7;
+      --ink-soft: #a5b3c8;
+      --ink-faint: #7b8ba3;
+      --rule: #24304433;
+      --accent: #7db8ee;
+      --accent-bright: #4da3ea;
+      --accent-wash: #14263a;
+      --ok: #7fcb9b;
+      --ok-wash: #12271c;
+      --warn: #e0a765;
+      --warn-wash: #2a1e10;
+      --code-bg: #0e1726;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 14px 30px -22px rgba(0,0,0,.8);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #0b1220;
+    --card: #131c2c;
+    --ink: #e8eef7;
+    --ink-soft: #a5b3c8;
+    --ink-faint: #7b8ba3;
+    --rule: #24304433;
+    --accent: #7db8ee;
+    --accent-bright: #4da3ea;
+    --accent-wash: #14263a;
+    --ok: #7fcb9b;
+    --ok-wash: #12271c;
+    --warn: #e0a765;
+    --warn-wash: #2a1e10;
+    --code-bg: #0e1726;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 14px 30px -22px rgba(0,0,0,.8);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 400 16px/1.65 -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 780px; margin: 0 auto; padding: 56px 24px 80px; }
+
+  /* ---- masthead ---- */
+  header { border-bottom: 2px solid var(--ink); padding-bottom: 22px; }
+  .eyebrow {
+    font: 600 11.5px/1 ui-monospace, "Cascadia Code", Consolas, monospace;
+    letter-spacing: .16em; text-transform: uppercase; color: var(--accent);
+  }
+  h1 {
+    font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+    font-size: clamp(30px, 5vw, 42px); font-weight: 700; line-height: 1.1;
+    letter-spacing: -.015em; margin: 14px 0 0; text-wrap: balance;
+  }
+  .standfirst {
+    margin: 12px 0 0; color: var(--ink-soft); font-size: 17px; max-width: 60ch;
+  }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 8px 10px; margin-top: 18px;
+    font: 500 12.5px/1 ui-monospace, Consolas, monospace; color: var(--ink-faint);
+  }
+  .meta span { background: var(--code-bg); border-radius: 4px; padding: 6px 9px; }
+
+  /* ---- steps: a real sequence, so numbering carries meaning ---- */
+  ol.steps { list-style: none; margin: 44px 0 0; padding: 0; display: grid; gap: 26px; }
+  ol.steps > li {
+    display: grid; grid-template-columns: 42px 1fr; gap: 18px; align-items: start;
+  }
+  .num {
+    font: 700 15px/40px Georgia, serif; text-align: center;
+    width: 40px; height: 40px; border-radius: 50%;
+    background: var(--card); color: var(--accent);
+    border: 1.5px solid var(--rule); box-shadow: var(--shadow);
+  }
+  h2 {
+    font-family: Georgia, "Iowan Old Style", serif;
+    font-size: 21px; font-weight: 700; margin: 6px 0 8px; letter-spacing: -.01em;
+  }
+  h3 {
+    font: 600 13px/1 ui-monospace, Consolas, monospace; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--ink-faint); margin: 28px 0 12px;
+  }
+  p { margin: 0 0 12px; }
+  .step-body > :last-child { margin-bottom: 0; }
+  ul.plain { margin: 0 0 12px; padding-left: 20px; }
+  ul.plain li { margin-bottom: 6px; }
+
+  code, kbd, .path {
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+    font-size: .88em; background: var(--code-bg); border-radius: 4px;
+    padding: 2px 6px; color: var(--ink); word-break: break-all;
+  }
+  kbd { border: 1px solid var(--rule); box-shadow: 0 1px 0 var(--rule); font-weight: 600; }
+  .path { display: inline-block; color: var(--accent); }
+
+  .note, .caution {
+    border-left: 3px solid var(--ok); background: var(--ok-wash);
+    padding: 12px 14px; border-radius: 0 8px 8px 0; margin: 14px 0;
+    font-size: 14.5px; color: var(--ink);
+  }
+  .caution { border-left-color: var(--warn); background: var(--warn-wash); }
+  .note strong, .caution strong { display: block; margin-bottom: 3px; font-size: 13px;
+    letter-spacing: .04em; text-transform: uppercase; }
+  .note strong { color: var(--ok); }
+  .caution strong { color: var(--warn); }
+
+  /* ---- tour cards ---- */
+  .tour { display: grid; gap: 12px; margin-top: 14px; }
+  .tour article {
+    background: var(--card); border: 1px solid var(--rule); border-radius: 10px;
+    padding: 14px 16px; box-shadow: var(--shadow);
+  }
+  .tour h4 {
+    margin: 0 0 4px; font-size: 15px; font-weight: 650;
+    display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  }
+  .tour h4 em {
+    font: 500 11.5px/1 ui-monospace, Consolas, monospace; font-style: normal;
+    color: var(--accent); background: var(--accent-wash); padding: 4px 7px; border-radius: 999px;
+  }
+  .tour p { margin: 0; font-size: 14.5px; color: var(--ink-soft); }
+
+  /* ---- troubleshooting ---- */
+  .scroller { overflow-x: auto; margin-top: 14px; }
+  table { border-collapse: collapse; width: 100%; min-width: 520px; font-size: 14.5px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th {
+    font: 600 11.5px/1 ui-monospace, Consolas, monospace; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--ink-faint);
+  }
+  td:first-child { color: var(--ink); font-weight: 550; }
+
+  footer {
+    margin-top: 52px; padding-top: 20px; border-top: 1px solid var(--rule);
+    font-size: 13.5px; color: var(--ink-faint);
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+  a:focus-visible, li:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 3px; }
+    .cmd {
+      background: #0f1b2d; color: #d7e6f7; border-radius: 8px; padding: 10px 13px;
+      font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; overflow-x: auto;
+      margin: 8px 0 12px;
+    }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Install guide · Chrome extension</div>
+    <h1>Org Lens Setup</h1>
+    <p class="standfirst">
+      Inspect and export Salesforce metadata: schema, permissions, automation, code, tests and
+      org health, straight from your browser. Nothing is installed into Salesforce, and no admin setup is
+      required in any org.
+    </p>
+    <div class="meta">
+      <span>~5 minutes</span>
+      <span>Chrome or Edge</span>
+      <span>Your existing session</span>
+    </div>
+  </header>
+
+  <h3>Part one · Install</h3>
+
+  <ol class="steps">
+    <li>
+      <div class="num">1</div>
+      <div class="step-body">
+        <h2>Create a permanent folder</h2>
+        <p>
+          Chrome loads an unpacked extension from its folder every time it starts, so the files
+          need a home they will keep. Create <span class="path">C:\Tools\OrgLens</span>.
+          Open <code>C:\</code>, right-click → <strong>New → Folder</strong> → name it
+          <code>Tools</code>, then create <code>OrgLens</code> inside it.
+        </p>
+        <div class="caution">
+          <strong>Don't use Downloads</strong>
+          If the folder is later cleaned up or moved, the extension silently stops working.
+        </div>
+      </div>
+    </li>
+
+    <li>
+      <div class="num">2</div>
+      <div class="step-body">
+        <h2>Get the files from GitHub</h2>
+        <p>
+          Everything lives at <a href="https://github.com/dineshkothuru/org-lens" target="_blank" rel="noopener">https://github.com/dineshkothuru/org-lens</a>.
+          Take either route.
+        </p>
+        <p>
+          <strong>With git</strong>, which also makes updates one command:
+        </p>
+        <pre class="cmd">git clone https://github.com/dineshkothuru/org-lens.git C:\Tools\OrgLens</pre>
+        <p>
+          <strong>Without git</strong>: on the repo page press <strong>Code</strong> →
+          <strong>Download ZIP</strong>, then right-click the download →
+          <strong>Extract All…</strong> → browse to <span class="path">C:\Tools\OrgLens</span>.
+        </p>
+        <p>
+          Check the result: <code>manifest.json</code>, <code>app.html</code>, <code>app.js</code>
+          and an <code>icons</code> folder should sit directly in <code>OrgLens</code>.
+        </p>
+        <div class="caution">
+          <strong>One level too deep?</strong>
+          A GitHub ZIP extracts into a folder of its own, so you may end up with
+          <code>OrgLens\org-lens-main\manifest.json</code>. Move the inner files up one level.
+          Chrome needs <code>manifest.json</code> at the folder root.
+        </div>
+      </div>
+    </li>
+
+    <li>
+      <div class="num">3</div>
+      <div class="step-body">
+        <h2>Load it in Chrome</h2>
+        <ul class="plain">
+          <li>Open a new tab and go to <code>chrome://extensions</code>.</li>
+          <li>Turn on <strong>Developer mode</strong>, the toggle sits at the top right.</li>
+          <li>Click <strong>Load unpacked</strong> and select <span class="path">C:\Tools\OrgLens</span>.</li>
+          <li>The Org Lens card appears, showing its version number.</li>
+        </ul>
+        <div class="note">
+          <strong>Expected</strong>
+          Chrome shows a “disable developer mode extensions” reminder after some restarts. It is
+          harmless, dismiss it and carry on.
+        </div>
+      </div>
+    </li>
+
+    <li>
+      <div class="num">4</div>
+      <div class="step-body">
+        <h2>Pin the icon</h2>
+        <p>
+          Click the puzzle-piece icon in the Chrome toolbar, find <strong>Org Lens</strong>, and
+          click the pin. That is the whole installation, there is nothing to configure in
+          Salesforce.
+        </p>
+      </div>
+    </li>
+  </ol>
+
+  <h3>Part two · Use it</h3>
+
+  <ol class="steps" start="5">
+    <li>
+      <div class="num">5</div>
+      <div class="step-body">
+        <h2>Log into Salesforce, then click the icon</h2>
+        <p>
+          Open any org the way you normally do. With that tab active, click the Org Lens icon: it
+          opens in a full tab, already pointed at that org. Logged into several orgs? Pick one from
+          the dropdown, every org your browser has a live session for is listed.
+        </p>
+        <p>
+          Org Lens reads the session of the org you choose and calls that org's API directly from
+          your browser. Nothing is stored, and nothing is sent anywhere else.
+        </p>
+      </div>
+    </li>
+
+    <li>
+      <div class="num">6</div>
+      <div class="step-body">
+        <div class="note">
+          <strong>New in this version</strong>
+          <b>Documentation pack</b> builds one branded document from the org: overview, schema diagram,
+          object catalogue, automation and permissions, as HTML to print or a file Word opens.
+          <b>Sharing model</b> shows the org-wide default on every object, the role hierarchy, and what is
+          actually granting access, including Apex sharing reasons and real share-row counts.
+          <b>Security posture</b> names everyone who can bypass sharing and how they got the permission.
+          <b>Export all metadata</b> asks the Metadata API for every type, zipping package.xml with an
+          inventory of every component. <b>SOQL</b> completes real field names and expands all fields.
+          <b>Code search</b> opens a whole LWC bundle rather than one file of it.
+        </div>
+
+        <h2>Find what you need</h2>
+        <div class="tour">
+          <article>
+            <h4>Org health <em>lands here</em></h4>
+            <p>API calls, storage and async limits, plus a live inventory: objects, fields, Apex, flows, permission sets, reports. Export it as a snapshot, or run the all-in-one org audit. <b>Show all limits</b> opens the full table, every limit the org reports rather than the six headline tiles, with whatever sits closest to its ceiling on top.</p>
+          </article>
+          <article>
+            <h4>Object browser <em>day to day</em></h4>
+            <p>Search an object, click it, read every field, types, required flags, formulas, picklist values. Click a field to see which profiles and permission sets can read or edit it, with missing access flagged in red.</p>
+          </article>
+          <article>
+            <h4>Documentation pack <em>client deliverable</em></h4>
+            <p>One branded document instead of seven exports: org overview and limits, the schema diagram as you arranged it, an object catalogue with every field and what each lookup points at, the automation that fires on those objects, and the permissions picture including who holds the permissions that bypass everything. Put a title, client name and your name on the cover, then download it as HTML to print to PDF, or as a file Word opens directly.</p>
+          </article>
+          <article>
+            <h4>Schema export <em>documentation</em></h4>
+            <p>One workbook: objects, fields, record types, relationships, picklists, validation rules and code inventory.</p>
+          </article>
+          <article>
+            <h4>Deployment package <em>releases</em></h4>
+            <p>Pick a date and get everything changed since then, plus a ready-to-use <code>package.xml</code> for the Salesforce CLI. A second button below it, <b>Export all metadata</b>, asks the Metadata API instead: that enumerates every type the org supports, including sharing rules, layout assignments, translations, custom metadata records and email templates that REST cannot see. It returns a zip holding package.xml plus an Excel inventory of every component with its last-modified date and author, with managed-package components left out unless you ask for them.</p>
+          </article>
+          <article>
+            <h4>Sharing model <em>architecture</em></h4>
+            <p>Which records a user can see, rather than which objects and fields. The org-wide default on every object for internal and external users, how many sharing rules widen each one, the role hierarchy as an indented tree with a headcount per role, and the public groups and queues with their membership. Filter to the objects that are not Private for a review. Rule criteria are not included: those need a metadata retrieve. A third block shows what is granting access in practice: custom Apex sharing reasons, restriction and scoping rules, a per-object count of real share rows split by cause (owner, sharing rule, team, manual, or one of your Apex reasons), and the Apex classes that write to a share object. Sharing sets, share groups and implicit sharing are not exposed by any API and are stated as absent.</p>
+          </article>
+          <article>
+            <h4>Security posture <em>audits</em></h4>
+            <p>Who can Modify All Data, View All Data, Author Apex or Manage Users, with the row saying whether it came from their profile or an assigned permission set. Plus the cleanup list, which understands permission set groups: a set granted only inside a group is reported as in use and names the group, group aggregates and muting sets are left out, and any group still waiting to be recalculated is flagged. Then the genuinely dead ones: permission sets with no assignees and profiles with no users. Tick off inactive users to get the stricter read an audit wants.</p>
+          </article>
+          <article>
+            <h4>Profile &amp; permission set compare <em>audits</em></h4>
+            <p>Differences only: object CRUD, field security, system permissions, Apex and tab access. Each side picks its own org and its own name, so this works within one org or across orgs. <b>+ Add another org</b> adds a third side or more, which turns the result into a matrix: one row per permission, one column per side, and a column saying whether they all match.</p>
+          </article>
+          <article>
+            <h4>Schema diagram <em>documentation</em></h4>
+            <p>Pick objects and get a proper ERD: layered layout, right-angle routing, crow's-foot cardinality, master-detail solid and lookups dashed, junction objects flagged. Lines arc over each other where they cross, so a relationship can be followed by eye. Drag boxes, undo a move with Ctrl+Z, find an object by name to tint it, hover a box to dim everything unrelated, click <b>+</b> to pull in its neighbours, then export SVG, PNG or PDF with a title block.</p>
+          </article>
+          <article>
+            <h4>Code search <em>where is this used</em></h4>
+            <p>Grep the source of Apex, Visualforce, LWC and Aura for a string, every matching line with its file and line number. Or press <b>List all files</b> to browse everything and click a file to read its full source. Opening one file of an LWC or Aura bundle opens the whole bundle: the js, html, css and js-meta.xml appear as tabs in reading order, with a total line count, because reading one file of a four-file component tells you very little. Search results are clickable: pick a hit and the whole file opens with every matching line marked and the one you clicked scrolled to. LWC and Aura searches skip managed-package sources, which is most of the volume on an org with big packages.</p>
+          </article>
+          <article>
+            <h4>SOQL query <em>ad hoc</em></h4>
+            <p>Run any read-only SELECT against the Data or Tooling API, read the rows here, export them to Excel. It refuses anything that is not a SELECT. Field names complete as you type: it reads the object in your FROM clause and offers its real fields, with types. A suggestion ending in a dot walks the relationship, so Owner. leads straight to the User fields behind it. Ctrl+Space asks for suggestions anywhere. A "* all fields" entry expands every field of that object into the SELECT list, so you never type them out; FIELDS(ALL) is offered beside it for when the 200-row cap is acceptable.</p>
+          </article>
+          <article>
+            <h4>Setup audit trail <em>who changed what</em></h4>
+            <p>Every Setup change since a date, with who made it and in which area. Filter by user or action text, the first place to look when something broke yesterday.</p>
+          </article>
+          <article>
+            <h4>Tests &amp; coverage <em>before deploying</em></h4>
+            <p>Org-wide and per-class Apex coverage, a one-tick filter for classes below 75%, recent test failures, and a popup showing exactly which test classes cover a given class.</p>
+          </article>
+          <article>
+            <h4>Scheduled &amp; failed jobs <em>morning check</em></h4>
+            <p>What is scheduled to run and what failed overnight, scheduled Apex, batch, queueable and future methods, with the actual error message and how far the batch got before it died.</p>
+          </article>
+          <article>
+            <h4>Record counts <em>sizing</em></h4>
+            <p>How many records each object holds, biggest first, with empty objects flagged, useful for migrations, sandbox planning, and spotting objects nobody uses.</p>
+          </article>
+          <article>
+            <h4>User access <em>access tickets</em></h4>
+            <p>Search a person and see what they can <i>actually</i> do, their profile and every assigned permission set merged, with a “granted via” column naming the source of each right. The answer to “why can this user see that?”.</p>
+          </article>
+          <article>
+            <h4>Permissions matrix <em>security review</em></h4>
+            <p>Tick objects and get object CRUD per profile and permission set on screen, plus a workbook with field-level security and a fields × profiles matrix.</p>
+          </article>
+          <article>
+            <h4>Org compare <em>sandbox vs production</em></h4>
+            <p>Row A is the org you are signed into. Pick another org in row B and you get the detailed A vs B diff: objects, fields, validation rules, Apex, LWC, flows, profiles, permission sets, labels, record types and more. Press <b>+ Add another org</b> for a third or fourth and it switches to a matrix instead: every component found in any of them, a column per org, and what differs. The two buttons relabel themselves, so you can see which comparison you are about to run.</p>
+          </article>
+          <article>
+            <h4>Automation <em>debugging</em></h4>
+            <p>Everything that fires when a record is saved, for one object or the whole org: Apex triggers with their events, record-triggered flows before and after save, process builders, workflow rules, and OmniStudio.</p>
+          </article>
+          <article>
+            <h4>Where is it used? <em>before you change it</em></h4>
+            <p>Pick any component: field, object, Apex class, LWC, flow, layout, label, and see what references it, so you know what breaks before you touch it. Fields are matched by id, so same-named fields on other objects are not mixed in.</p>
+          </article>
+          <article>
+            <h4>Field usage <em>cleanup</em></h4>
+            <p>How populated each field is, and which fields hold no data <em>and</em> have no metadata references, your genuine deletion candidates.</p>
+          </article>
+        </div>
+        <div class="note">
+          <strong>Three ways out</strong>
+          Every panel can show results on screen, <b>Copy</b> the table straight to your clipboard
+          (it pastes as a real table into Teams, Slack, Jira or Excel), or export a workbook. Start
+          on screen; copy for a quick answer; export when it needs to be a document.
+        </div>
+        <div class="note">
+          <strong>Queries you run often</strong>
+          In the SOQL panel, <b>Save current</b> keeps a query under a name you choose, so next week
+          it is one pick from the dropdown rather than retyping.
+        </div>
+      </div>
+    </li>
+  </ol>
+
+  <h3>If something looks wrong</h3>
+  <div class="scroller">
+    <table>
+      <thead>
+        <tr><th>What you see</th><th>Why</th><th>Fix</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>“No logged-in Salesforce orgs found”</td>
+          <td>No live Salesforce session in this browser.</td>
+          <td>Log into an org in another tab, then click <strong>Refresh org list</strong>.</td>
+        </tr>
+        <tr>
+          <td>Clicking the icon does nothing</td>
+          <td>Chrome dropped the extension because its folder moved.</td>
+          <td>Re-run <strong>Load unpacked</strong> against <code>C:\Tools\OrgLens</code>.</td>
+        </tr>
+        <tr>
+          <td>Org health is empty, exports still work</td>
+          <td>Your user lacks “View Setup and Configuration”.</td>
+          <td>Expected: everything else is unaffected.</td>
+        </tr>
+        <tr>
+          <td>“Session expired”</td>
+          <td>You logged out of Salesforce, so the session died with it.</td>
+          <td>Log back in, then reopen Org Lens.</td>
+        </tr>
+        <tr>
+          <td>A panel reports a component type as unavailable</td>
+          <td>That feature isn't enabled in the org (OmniStudio, the beta Dependency API, and so on).</td>
+          <td>Expected: other sections still run and the sheet says what was skipped.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+    <div class="note">
+      <strong>API calls</strong>
+      Every panel spends API requests. Most cost a handful; a schema export or diagram costs one
+      describe per object; <b>field usage costs one aggregate per field</b>, so keep that selection
+      small. Org health shows what is left of the daily allowance: press <b>Show all limits</b> and
+      look at Daily Api Requests.
+    </div>
+  <footer>
+    Built by <a href="https://www.linkedin.com/in/dinesh-kumar-kothuru/" target="_blank" rel="noopener">Dinesh Kothuru</a> &middot; <a href="https://github.com/dineshkothuru/org-lens" target="_blank" rel="noopener">github.com/dineshkothuru/org-lens</a>
+    . To update, run <code>git pull</code> in the folder, or download the ZIP again and extract it over the same folder, then press refresh on the
+    Org Lens card in <code>chrome://extensions</code>.
+      <div class="stamp">Guide for Org Lens v1.52 &middot; updated 23 August 2026</div>
+    </footer>
+</div>
