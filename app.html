@@ -71,12 +71,12 @@
 
   label { display: block; font-size: 13px; font-weight: 600; margin: 16px 0 6px; color: var(--ink); }
   .hint { font-weight: 400; color: var(--faint); font-size: 12px; }
-  input[type=text], input[type=search], input[type=date], select {
+  input[type=text], input[type=search], input[type=date], input[type=number], select {
     width: 100%; padding: 11px 14px; border: 1.5px solid var(--border); border-radius: 10px;
     font-size: 14px; font-family: inherit; background: var(--field-bg); color: var(--ink);
     transition: border-color .15s, background .15s, box-shadow .15s;
   }
-  input[type=text]:focus, input[type=search]:focus, input[type=date]:focus, select:focus {
+  input[type=text]:focus, input[type=search]:focus, input[type=date]:focus, input[type=number]:focus, select:focus {
     outline: none; border-color: var(--brand); background: #fff;
     box-shadow: 0 0 0 3px rgba(1,118,211,.15);
   }
@@ -208,7 +208,7 @@
   .content .btnrow { margin-top: 22px; display: flex; gap: 12px; flex-wrap: wrap; }
   .content .emptyhint { margin-top: 22px; }
   .content .resultbox { margin-top: 22px; }
-  .content input[type=text], .content input[type=search], .content input[type=date], .content select { max-width: 560px; display: block; }
+  .content input[type=text], .content input[type=search], .content input[type=date], .content input[type=number], .content select { max-width: 560px; display: block; }
   .content .chk, .content .picker { max-width: none; }
   .content .foot { max-width: none; }
   /* Sticky alone does nothing once twenty panels make the nav taller than the screen, so it
@@ -635,7 +635,7 @@
     .shell { grid-template-columns: 260px minmax(0, 1fr); gap: 22px; }
     .navitem { font-size: 14px; padding: 12px 15px; }
     .content { padding: 34px 40px 30px; }
-    .content input[type=text], .content input[type=search], .content input[type=date], .content select { max-width: 680px; }
+    .content input[type=text], .content input[type=search], .content input[type=date], .content input[type=number], .content select { max-width: 680px; }
     .optgrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .rowgrid > div { min-width: 240px; }
   }
@@ -652,7 +652,7 @@
     .picklist { max-height: 320px; }
     .tiles { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
     .optgrid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-    .content input[type=text], .content input[type=search], .content input[type=date], .content select { max-width: 760px; }
+    .content input[type=text], .content input[type=search], .content input[type=date], .content input[type=number], .content select { max-width: 760px; }
   }
 
   /* One screen, no page scroll. The sidebar and the panel each scroll inside their own box,
@@ -834,6 +834,10 @@
       <button class="navitem" data-panel="panelSecurity">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
         Security posture
+      </button>
+      <button class="navitem" data-panel="panelPermPlan">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        Permission plan
       </button>
       <button class="navitem" data-panel="panelPerms">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
@@ -1624,6 +1628,76 @@
           <div class="tblwrap" style="max-height:330px;"><table class="tbl"><thead><tr><th>User</th><th>Username</th><th>Profile</th><th>Active</th><th>Permission</th><th>Granted via</th></tr></thead><tbody id="secElevList"></tbody></table></div>
           <div class="fieldhdr" style="margin-top:18px;"><span class="pill">Unused</span><h2 style="font-size:14px;" id="secUnusedTitle"></h2></div>
           <div class="tblwrap" style="max-height:300px;"><table class="tbl"><thead><tr><th>Type</th><th>Name</th><th>Note</th></tr></thead><tbody id="secUnusedList"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- Permission plan -->
+      <div id="panelPermPlan" style="display:none;">
+        <h2>Permission plan</h2>
+        <div class="sub2">Salesforce's own converter turns one profile into one permission set, which leaves the same sprawl in a new shape. This works out what the target design should be: the permissions almost every profile grants (one shared set), the profiles that are near-identical (one set between them), and what each profile still needs on its own. It produces a plan and a deployable package, and never writes to the org.</div>
+
+        <label for="ppSearch">Profiles <span class="hint">(tick the ones to plan for, or use every profile)</span></label>
+        <input type="search" id="ppSearch" class="searchbox" placeholder="Search profiles&hellip;" spellcheck="false">
+        <div class="picklist" id="ppList" style="max-width:none;"></div>
+        <div class="pickmeta" style="max-width:none;">
+          <span id="ppCount">0 selected</span> &middot;
+          <a id="ppAll">select all</a> &middot;
+          <a id="ppClear">clear</a> &middot;
+          <a id="ppUsed">only profiles that have users</a>
+        </div>
+
+        <div class="optgrid" style="margin-top:14px;">
+          <label class="chk" for="ppFls">
+            <input type="checkbox" id="ppFls">
+            <span><span class="t">Include field-level security</span>
+            <span class="s" style="display:block;">Far more thorough, and far heavier: field permissions are per profile per field, so this is thousands of rows. Leave it off for a first pass.</span></span>
+          </label>
+          <label class="chk" for="ppSkipUnused">
+            <input type="checkbox" id="ppSkipUnused" checked>
+            <span><span class="t">Leave out profiles with no users</span>
+            <span class="s" style="display:block;">Those should be deleted rather than converted, and they are listed separately.</span></span>
+          </label>
+        </div>
+
+        <div class="rowgrid" style="max-width:900px;">
+          <div>
+            <label for="ppBaseline" style="margin-top:0;">Shared by at least <span class="hint">(percent of profiles, for the baseline set)</span></label>
+            <input type="number" id="ppBaseline" value="90" min="50" max="100" step="5" style="max-width:120px;">
+          </div>
+          <div>
+            <label for="ppSimilar" style="margin-top:0;">Group profiles above <span class="hint">(percent similarity)</span></label>
+            <input type="number" id="ppSimilar" value="90" min="50" max="100" step="5" style="max-width:120px;">
+          </div>
+        </div>
+
+        <div class="btnrow" style="display:flex; gap:12px; flex-wrap:wrap;">
+          <button class="primary" id="ppAnalyseBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Analyse
+          </button>
+          <button class="primary" id="ppPackageBtn" title="permissionset XML plus package.xml, ready to deploy with your own pipeline">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/></svg>
+            Download package
+          </button>
+          <button class="primary" id="ppExportBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export plan
+          </button>
+        </div>
+
+        <div id="ppResult" class="resultbox" style="display:none;">
+          <div class="fieldhdr" style="margin-top:4px;"><span class="pill">Plan</span><h2 id="ppResTitle" style="font-size:15px;"></h2></div>
+          <div class="sub2" id="ppResNote"></div>
+          <div class="accsum" id="ppResSummary"></div>
+
+          <div class="fieldhdr" style="margin-top:16px;"><span class="pill">Proposed permission sets</span><h2 style="font-size:14px;" id="ppSetsTitle"></h2></div>
+          <div class="tblwrap" style="max-height:300px;"><table class="tbl"><thead><tr><th>Permission set</th><th>Kind</th><th>Permissions</th><th>Covers</th></tr></thead><tbody id="ppSetsList"></tbody></table></div>
+
+          <div class="fieldhdr" style="margin-top:18px;"><span class="pill">Profiles</span><h2 style="font-size:14px;" id="ppProfTitle"></h2></div>
+          <div class="tblwrap" style="max-height:340px;"><table class="tbl"><thead><tr><th>Profile</th><th>Users</th><th>Permissions today</th><th>Gets</th><th>Own permissions left</th><th>Recommendation</th></tr></thead><tbody id="ppProfList"></tbody></table></div>
+
+          <div class="fieldhdr" style="margin-top:18px;"><span class="pill">Stays on the profile</span><h2 style="font-size:14px;">What a permission set cannot hold</h2></div>
+          <div class="tblwrap" style="max-height:220px;"><table class="tbl"><thead><tr><th>Setting</th><th>Why</th></tr></thead><tbody id="ppStaysList"></tbody></table></div>
         </div>
       </div>
 

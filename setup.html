@@ -370,6 +370,10 @@
             <p>Tick objects and get object CRUD per profile and permission set on screen, plus a workbook with field-level security and a fields × profiles matrix.</p>
           </article>
           <article>
+            <h4>Permission plan <em>profiles to permission sets</em></h4>
+            <p>Salesforce&rsquo;s own converter turns one profile into one permission set, so ninety profiles become ninety permission sets and the sprawl only changes shape. This works out the design instead: tick the profiles and you get the permissions nearly all of them grant already (one shared <b>baseline</b>), the profiles that are effectively the same job (one <b>persona</b> set between them), and what is genuinely left over per profile (its <b>delta</b>). Each proposal is checked by putting it back together and comparing it to the profile it replaces, so the plan cannot quietly drop access, and the baseline is only offered to profiles that already grant all of it, so it cannot quietly add any either. <b>Download package</b> gives you <code>permissionset-meta.xml</code> files and a <code>package.xml</code> to deploy through your own pipeline; nothing is ever written to your org from here. Login hours, login IP ranges, layout assignments and record-type defaults stay on the profile, and the plan says so.</p>
+          </article>
+          <article>
             <h4>Org compare <em>sandbox vs production</em></h4>
             <p>Row A is the org you are signed into. Pick another org in row B and you get the detailed A vs B diff: objects, fields, validation rules, Apex, LWC, flows, profiles, permission sets, labels, record types and more. Press <b>+ Add another org</b> for a third or fourth and it switches to a matrix instead: every component found in any of them, a column per org, and what differs. The two buttons relabel themselves, so you can see which comparison you are about to run.</p>
           </article>
@@ -448,6 +452,6 @@
     Built by <a href="https://www.linkedin.com/in/dinesh-kumar-kothuru/" target="_blank" rel="noopener">Dinesh Kothuru</a> &middot; <a href="https://github.com/dineshkothuru/org-lens" target="_blank" rel="noopener">github.com/dineshkothuru/org-lens</a>
     . To update, run <code>git pull</code> in the folder, or download the ZIP again and extract it over the same folder, then press refresh on the
     Org Lens card in <code>chrome://extensions</code>.
-      <div class="stamp">Guide for Org Lens v1.58 &middot; updated 23 August 2026</div>
+      <div class="stamp">Guide for Org Lens v1.59 &middot; updated 24 August 2026</div>
     </footer>
 </div>

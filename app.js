@@ -1,4 +1,4 @@
-const APP_VERSION = "v2.09 · 2026-08-23";
+const APP_VERSION = "v2.10 · 2026-08-24";
 const API_VERSION = "v61.0";
 const SKIP_SUFFIXES = ["Share", "History", "Feed", "ChangeEvent", "Tag"];
 const CONCURRENCY = 8;
@@ -146,10 +146,10 @@ function disconnect() {
 
 // ---------- side nav ----------
 let orgIsSandbox = null;      // true, false, or null when the org type could not be read
-const PANELS = ["panelHealth", "panelAudit", "panelTests", "panelCounts", "panelJobs", "panelErd", "panelCode", "panelSoql", "panelSchema", "panelPackage", "panelCompare", "panelPerms", "panelAuto", "panelDeps", "panelUsage", "panelBrowser", "panelProfCmp", "panelUserAccess", "panelDoc", "panelSecurity", "panelSharing"];
+const PANELS = ["panelHealth", "panelAudit", "panelTests", "panelCounts", "panelJobs", "panelErd", "panelCode", "panelSoql", "panelSchema", "panelPackage", "panelCompare", "panelPerms", "panelAuto", "panelDeps", "panelUsage", "panelBrowser", "panelProfCmp", "panelUserAccess", "panelDoc", "panelSecurity", "panelSharing", "panelPermPlan"];
 // Result cards are per-run snapshots, so drop them whenever the panel changes —
 // otherwise you come back to a panel showing results for a different selection.
-const RESULT_BOXES = ["permResult", "autoResult", "usageResult", "depsResult", "pkgResult", "unusedResult", "profResult", "orgResult", "mxResult", "uaResult", "soqlResult", "codeResult", "codeListResult", "auditResult", "testsResult", "countsResult", "jobsResult", "erdResult", "bFLSInline", "bRTInline", "docResult", "secResult", "shResult", "mdResult", "pmxResult", "limitsBox", "shApexBox", "codeHitBox"];
+const RESULT_BOXES = ["permResult", "autoResult", "usageResult", "depsResult", "pkgResult", "unusedResult", "profResult", "orgResult", "mxResult", "uaResult", "soqlResult", "codeResult", "codeListResult", "auditResult", "testsResult", "countsResult", "jobsResult", "erdResult", "bFLSInline", "bRTInline", "docResult", "secResult", "shResult", "mdResult", "pmxResult", "limitsBox", "shApexBox", "codeHitBox", "ppResult"];
 function hideResultBoxes() {
   for (const b of RESULT_BOXES) {
     const el = $(b);
@@ -193,6 +193,7 @@ function showPanel(id) {
   if (auth && id === "panelProfCmp") initProfCmp();
   if (auth && id === "panelCompare") loadMxOrgs();
   if (auth && id === "panelDoc") initDoc();
+  if (auth && id === "panelPermPlan") initPermPlan();
   if (auth && id === "panelPerms") initPerms();
   if (auth && id === "panelAuto") initAuto();
   if (auth && id === "panelUsage") initUsage();
@@ -2530,6 +2531,505 @@ const setupUrl = {
   permSetGroup: (id, org) => baseUrl(org) + SETUP_PATH.permSetGroup + encodeURIComponent(`/${id}`),
   home: (org) => baseUrl(org) + SETUP_PATH.home,
 };
+
+// ---------- permission plan ----------
+// Salesforce's own converter maps one profile onto one permission set, so ninety profiles
+// become ninety permission sets and the sprawl simply changes shape. The useful question is
+// what the target design should be, and that is a comparison problem: what nearly every
+// profile grants anyway (one shared set), which profiles are effectively the same (one set
+// between them), and what is genuinely left per profile. Read-only throughout; the output is
+// a plan and a package to deploy through your own pipeline.
+const ppSel = new Set();
+let ppProfiles = [];          // [{id, profileId, name, users}]
+let ppPlan = null;            // the analysed result
+let ppSysFields = null;       // the Permissions* fields on PermissionSet, described once
+
+// A permission is held as a token: a string, so profiles can be compared with set arithmetic,
+// and structured, so the same token can be turned back into metadata XML. One shape for both
+// uses means the reading and the writing cannot drift apart.
+const CRUD = [["PermissionsRead", "R"], ["PermissionsCreate", "C"], ["PermissionsEdit", "U"],
+              ["PermissionsDelete", "D"], ["PermissionsViewAllRecords", "VA"], ["PermissionsModifyAllRecords", "MA"]];
+const TAB_TO_META = { DefaultOn: "Visible", DefaultOff: "Available", Hidden: "None" };
+const ppChunk = (arr, n) => { const out = []; for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n)); return out; };
+const ppQuoted = (xs) => xs.map(x => `'${x}'`).join(",");
+
+// Some of these objects answer on the Tooling API in one org and the Data API in another,
+// so ask both rather than deciding from here which one an org will accept.
+async function eitherQuery(soql) {
+  try { return await stdQuery(soql); }
+  catch (err) { return await toolingQuery(soql); }
+}
+
+async function initPermPlan(force = false) {
+  if (ppProfiles.length && !force) return;
+  try {
+    setStatus("Reading profiles\u2026", "busy");
+    const rows = await stdQuery(
+      "SELECT Id, ProfileId, Profile.Name FROM PermissionSet WHERE IsOwnedByProfile = true ORDER BY Profile.Name");
+    // counted across every user type, so a guest or community profile is not called unused
+    const counts = new Map();
+    try {
+      for (const r of await stdQuery("SELECT ProfileId, COUNT(Id) c FROM User GROUP BY ProfileId")) {
+        counts.set(r.ProfileId, r.c || 0);
+      }
+    } catch (err) { console.warn("user counts unavailable:", err); }
+    ppProfiles = rows.map(r => ({ id: r.Id, profileId: r.ProfileId,
+      name: r.Profile?.Name || r.ProfileId, users: counts.get(r.ProfileId) || 0 }));
+    setStatus("");
+    renderPpList();
+  } catch (err) { setStatus(`Could not read profiles: ${err.message}`, "err"); }
+}
+
+function ppSetCount() { $("ppCount").textContent = `${ppSel.size} of ${ppProfiles.length} selected`; }
+
+function renderPpList() {
+  const term = $("ppSearch").value.trim().toLowerCase();
+  const list = ppProfiles.filter(p => !term || p.name.toLowerCase().includes(term));
+  $("ppList").innerHTML = list.slice(0, 400).map(p =>
+    `<label><input type="checkbox" data-pp="${escHtml(p.id)}" ${ppSel.has(p.id) ? "checked" : ""}>` +
+    `${escHtml(p.name)}<span class="api">${p.users ? `${p.users} user${p.users === 1 ? "" : "s"}` : "no users"}</span></label>`).join("")
+    || `<div style="padding:12px; color:var(--faint);">Nothing matches.</div>`;
+  ppSetCount();
+}
+
+// ---- reading ----
+
+// The system permissions are one boolean column each on PermissionSet, and which ones exist
+// depends on the org's licences and features, so the list is described rather than assumed.
+async function ppSystemFields() {
+  if (ppSysFields) return ppSysFields;
+  const d = await api("/sobjects/PermissionSet/describe");
+  ppSysFields = (d.fields || [])
+    .filter(f => f.type === "boolean" && f.name.indexOf("Permissions") === 0)
+    .map(f => f.name);
+  return ppSysFields;
+}
+
+async function ppFingerprints(profiles) {
+  const ids = profiles.map(p => p.id);
+  const tokens = new Map(ids.map(id => [id, new Set()]));
+  const step = (pct, label) => { setProgress(pct); setStatus(label, "busy"); };
+
+  // object permissions, in chunks rather than one query per profile
+  step(10, "Reading object permissions");
+  for (const part of ppChunk(ids, 150)) {
+    const rows = await stdQuery(
+      `SELECT ParentId, SobjectType, ${CRUD.map(c => c[0]).join(", ")} FROM ObjectPermissions ` +
+      `WHERE ParentId IN (${ppQuoted(part)})`);
+    for (const r of rows) {
+      const flags = CRUD.filter(([f]) => r[f]).map(([, s]) => s).join(",");
+      if (flags) tokens.get(r.ParentId)?.add(`obj:${r.SobjectType}:${flags}`);
+    }
+  }
+
+  // system permissions
+  step(28, "Reading system permissions");
+  try {
+    const fields = await ppSystemFields();
+    for (const part of ppChunk(ids, 80)) {
+      const res = await api(`/query/?q=${encodeURIComponent(
+        `SELECT Id, ${fields.join(", ")} FROM PermissionSet WHERE Id IN (${ppQuoted(part)})`)}`);
+      for (const r of res.records || []) {
+        for (const f of fields) if (r[f]) tokens.get(r.Id)?.add(`sys:${f.replace(/^Permissions/, "")}`);
+      }
+    }
+  } catch (err) { console.warn("system permissions unavailable:", err); }
+
+  // tab visibility
+  step(45, "Reading tab visibility");
+  for (const part of ppChunk(ids, 150)) {
+    try {
+      for (const r of await eitherQuery(
+        `SELECT ParentId, Name, Visibility FROM PermissionSetTabSetting WHERE ParentId IN (${ppQuoted(part)})`)) {
+        if (r.Visibility && r.Visibility !== "Hidden") tokens.get(r.ParentId)?.add(`tab:${r.Name}:${r.Visibility}`);
+      }
+    } catch (err) { console.warn("tab settings chunk failed:", err); }
+  }
+
+  // Apex class, Visualforce page and custom permission access, with ids resolved to names
+  step(60, "Reading Apex, page and custom permission access");
+  const sea = [];
+  for (const part of ppChunk(ids, 150)) {
+    try {
+      sea.push(...await stdQuery(
+        `SELECT ParentId, SetupEntityId, SetupEntityType FROM SetupEntityAccess ` +
+        `WHERE ParentId IN (${ppQuoted(part)}) AND SetupEntityType IN ('ApexClass','ApexPage','CustomPermission')`));
+    } catch (err) { console.warn("setup entity chunk failed:", err); }
+  }
+  const names = new Map();
+  const resolvers = [["ApexClass", "SELECT Id, Name FROM ApexClass WHERE Id IN"],
+                     ["ApexPage", "SELECT Id, Name FROM ApexPage WHERE Id IN"],
+                     ["CustomPermission", "SELECT Id, DeveloperName FROM CustomPermission WHERE Id IN"]];
+  for (const [type, soql] of resolvers) {
+    const entityIds = [...new Set(sea.filter(r => r.SetupEntityType === type).map(r => r.SetupEntityId))];
+    for (const part of ppChunk(entityIds, 200)) {
+      try {
+        for (const r of await eitherQuery(`${soql} (${ppQuoted(part)})`)) names.set(r.Id, r.Name || r.DeveloperName);
+      } catch (err) { console.warn(`${type} names unavailable:`, err); }
+    }
+  }
+  const KIND = { ApexClass: "apex", ApexPage: "page", CustomPermission: "cperm" };
+  for (const r of sea) {
+    const n = names.get(r.SetupEntityId);
+    if (n) tokens.get(r.ParentId)?.add(`${KIND[r.SetupEntityType]}:${n}`);
+  }
+
+  // field level security, only when asked, because this is per profile per field
+  let flsRows = 0, flsCapped = false;
+  if ($("ppFls").checked) {
+    step(75, "Reading field level security");
+    const CAP = 150000;
+    for (const part of ppChunk(ids, 30)) {
+      if (flsRows >= CAP) { flsCapped = true; break; }
+      try {
+        for (const r of await stdQuery(
+          `SELECT ParentId, Field, PermissionsRead, PermissionsEdit FROM FieldPermissions ` +
+          `WHERE ParentId IN (${ppQuoted(part)})`)) {
+          const f = (r.PermissionsEdit ? "E" : "") + (r.PermissionsRead ? "R" : "");
+          if (f) tokens.get(r.ParentId)?.add(`fls:${r.Field}:${f}`);
+          flsRows++;
+        }
+      } catch (err) { console.warn("field permissions chunk failed:", err); }
+      setProgress(75 + Math.min(20, (flsRows / CAP) * 20));
+      setStatus(`Reading field level security (${fmt(flsRows)} rows)`, "busy");
+    }
+  }
+  setProgress(null);
+  setStatus("");
+  return { tokens, flsRows, flsCapped };
+}
+
+// ---- analysis ----
+
+const jaccard = (a, b) => {
+  if (!a.size && !b.size) return 1;
+  let shared = 0;
+  for (const t of a) if (b.has(t)) shared++;
+  return shared / (a.size + b.size - shared);
+};
+
+function ppAnalyse(profiles, tokens, baselinePct, similarPct) {
+  // 1. the baseline: what nearly every profile grants anyway
+  const freq = new Map();
+  for (const p of profiles) for (const t of tokens.get(p.id)) freq.set(t, (freq.get(t) || 0) + 1);
+  const need = Math.ceil(profiles.length * (baselinePct / 100));
+  let baseline = new Set([...freq.entries()].filter(([, n]) => n >= need).map(([t]) => t));
+
+  // Below 100% the baseline holds things that not every profile has, so it can only be given
+  // to the profiles that already hold ALL of it. Handing it to the rest would quietly grant
+  // access nobody asked for, which is the one outcome a migration plan must never produce.
+  // The trade is worth stating plainly: a higher percentage makes a smaller baseline that
+  // more profiles fit, a lower one makes a fuller baseline that fewer profiles fit.
+  let fits = new Map(profiles.map(p => [p.id, [...baseline].every(t => tokens.get(p.id).has(t))]));
+  if (![...fits.values()].some(Boolean)) { baseline = new Set(); fits = new Map(profiles.map(p => [p.id, false])); }
+
+  // 2. what is left per profile, which is what actually distinguishes them
+  const rest = new Map(profiles.map(p => [p.id, fits.get(p.id)
+    ? new Set([...tokens.get(p.id)].filter(t => !baseline.has(t)))
+    : new Set(tokens.get(p.id))]));
+
+  // 3. group the ones that are effectively the same. Single link at the threshold: if A is
+  // close to B and B to C, all three share a set, which is what a persona looks like.
+  const threshold = similarPct / 100;
+  const groups = [];
+  for (const p of profiles) {
+    const near = groups.find(g => g.members.some(m => jaccard(rest.get(m.id), rest.get(p.id)) >= threshold));
+    if (near) near.members.push(p); else groups.push({ members: [p] });
+  }
+  // a group of one needs no shared set: its permissions are simply its own
+  // A persona with nothing in it is not a persona. Profiles whose residue is empty are alike
+  // in the only sense that matters, that the baseline already covers them, and proposing an
+  // empty permission set for them would put a file in the package that grants nothing.
+  const shared = groups.filter(g => g.members.length > 1).map(g => {
+    const sets = g.members.map(m => rest.get(m.id));
+    return { kind: "persona", members: g.members,
+      tokens: new Set([...sets[0]].filter(t => sets.every(s => s.has(t)))) };
+  }).filter(s => s.tokens.size).map((s, i) => ({ ...s, name: `Persona_${i + 1}` }));
+  const groupOf = new Map();
+  for (const g of shared) for (const m of g.members) groupOf.set(m.id, g);
+
+  // 4. a profile that already grants everything a persona grants joins it even when it is not
+  // similar enough to be a core member: the extras simply become its delta. This is the common
+  // real case, "the same job plus one thing", and similarity alone misses it, because on a small
+  // residue one extra permission is enough to drop a profile below the threshold.
+  // Containment must be total. A near miss would hand the profile access it does not have
+  // today, and the whole point is that only the shape changes.
+  for (const p of profiles) {
+    if (groupOf.has(p.id)) continue;
+    const r = rest.get(p.id);
+    const fit = shared
+      .filter(s => s.tokens.size && [...s.tokens].every(t => r.has(t))
+                   && (r.size - s.tokens.size) < s.tokens.size)   // and the persona is the bulk of it
+      .sort((a, b) => b.tokens.size - a.tokens.size)[0];
+    if (fit) { fit.members.push(p); groupOf.set(p.id, fit); }
+  }
+
+  // 5. and whatever a profile still needs after the baseline and its persona
+  // 6. proved by recomposing: baseline + persona + delta must reproduce the profile exactly
+  const planned = profiles.map(p => {
+    const g = groupOf.get(p.id) || null;
+    const delta = new Set([...rest.get(p.id)].filter(t => !(g && g.tokens.has(t))));
+    const rebuilt = new Set([...(fits.get(p.id) ? baseline : []), ...(g ? g.tokens : []), ...delta]);
+    const original = tokens.get(p.id);
+    return { profile: p, group: g, tokens: delta, total: original.size, base: fits.get(p.id),
+      ok: rebuilt.size === original.size && [...original].every(t => rebuilt.has(t)) };
+  });
+
+  const sets = [];
+  const onBaseline = profiles.filter(p => fits.get(p.id));
+  if (baseline.size) sets.push({ name: "Baseline_Access", kind: "baseline", tokens: baseline, members: onBaseline });
+  sets.push(...shared);
+  for (const d of planned) {
+    if (d.tokens.size) sets.push({ name: `${d.profile.name.replace(/[^A-Za-z0-9]+/g, "_").replace(/^_|_$/g, "")}_Delta`,
+      kind: "delta", tokens: d.tokens, members: [d.profile] });
+  }
+  return { baseline, sets, profiles: planned, onBaseline: onBaseline.length,
+    exact: planned.filter(v => v.ok).length };
+}
+
+// ---- rendering ----
+
+const PP_STAYS = [
+  ["Login hours and login IP ranges", "Only a profile can hold these; a permission set cannot."],
+  ["Page layout assignments", "Assigned per profile and record type, never by permission set."],
+  ["Record type defaults", "A permission set can grant a record type, but the default stays on the profile."],
+  ["Profile record type visibility", "Not readable through these APIs, so it is not in this plan at all."],
+  ["Default app and tab defaults", "Profile-level settings that a permission set does not replace."],
+];
+
+function ppRecommendation(d) {
+  if (!d.ok) return "Review: the plan does not reproduce it exactly";
+  if (d.group) return d.tokens.size
+    ? `Merge into ${d.group.name}, plus ${d.tokens.size} of its own`
+    : `Merge into ${d.group.name}`;
+  if (!d.tokens.size) return "Fully covered by the baseline";
+  if (!d.base) return "Outside the baseline, keeps its own set";
+  if (d.tokens.size > 40) return "Genuinely distinct, keep its own set";
+  return "Baseline plus a small delta";
+}
+
+function renderPlan() {
+  const p = ppPlan;
+  const kindLabel = { baseline: "shared by everyone", persona: "shared by a group", delta: "one profile only" };
+  $("ppResTitle").textContent = `${p.sets.length} permission sets proposed for ${p.profiles.length} profiles`;
+  $("ppResNote").textContent =
+    `The baseline is what at least ${p.baselinePct}% of the selected profiles already grant, and it is given only ` +
+    `to the ${p.onBaseline} profile${p.onBaseline === 1 ? "" : "s"} that already grant all of it, so nothing gains ` +
+    `access it did not have. ` +
+    (p.onBaseline < p.profiles.length
+      ? `${p.profiles.length - p.onBaseline} sit outside it and carry their own sets instead; raise the percentage ` +
+        `for a smaller baseline that more of them fit. ` : "") +
+    `Profiles more than ${p.similarPct}% alike, once the baseline is set aside, share a persona set, and a profile ` +
+    `that already grants everything a persona grants joins it with the extras as its delta. ` +
+    (p.exact === p.profiles.length
+      ? "Every profile is reproduced exactly by its baseline, persona and delta sets, so nothing is lost."
+      : `${p.exact} of ${p.profiles.length} profiles are reproduced exactly; the rest are flagged for review.`) +
+    (p.fls ? ` Field level security included, ${fmt(p.flsRows)} rows read${p.flsCapped ? ", capped" : ""}.`
+           : " Field level security was not included, so field access is not part of this plan.");
+  $("ppResSummary").innerHTML =
+    `<span class="fact">Baseline permissions: <b>${fmt(p.baseline.size)}</b></span>` +
+    `<span class="fact">Profiles on the baseline: <b>${p.onBaseline} of ${p.profiles.length}</b></span>` +
+    `<span class="fact">Persona sets: <b>${p.sets.filter(s => s.kind === "persona").length}</b></span>` +
+    `<span class="fact">Delta sets: <b>${p.sets.filter(s => s.kind === "delta").length}</b></span>` +
+    `<span class="fact">Profiles collapsed into a persona: <b>${p.profiles.filter(x => x.group).length}</b></span>` +
+    (p.exact === p.profiles.length ? `<span class="e">nothing lost</span>`
+                                   : `<span class="n">${p.profiles.length - p.exact} to review</span>`) +
+    (p.skipped.length ? `<span class="r">${p.skipped.length} with no users, left out</span>` : "");
+
+  $("ppSetsTitle").textContent = `${p.sets.length} sets`;
+  $("ppSetsList").innerHTML = p.sets.map(s =>
+    `<tr><td>${escHtml(s.name)}</td><td>${escHtml(kindLabel[s.kind])}</td><td>${fmt(s.tokens.size)}</td>` +
+    `<td>${s.kind === "baseline" ? `${s.members.length} profile${s.members.length === 1 ? "" : "s"}`
+      : escHtml(s.members.map(m => m.name).join(", "))}</td></tr>`).join("");
+
+  $("ppProfTitle").textContent = `${p.profiles.length} profiles`;
+  $("ppProfList").innerHTML = p.profiles.map(d => {
+    const gets = [d.base ? "Baseline_Access" : null, d.group?.name,
+      d.tokens.size ? "its own delta" : null].filter(Boolean).join(" + ") || "nothing";
+    const link = d.profile.profileId
+      ? `<a href="${escHtml(setupUrl.profile(d.profile.profileId))}" target="_blank" rel="noopener">${escHtml(d.profile.name)}</a>`
+      : escHtml(d.profile.name);
+    return `<tr><td>${link}</td><td>${d.profile.users || "none"}</td>` +
+      `<td>${fmt(d.total)}</td><td>${escHtml(gets)}</td><td>${fmt(d.tokens.size)}</td>` +
+      `<td${d.ok ? "" : ' class="accNone"'}>${escHtml(ppRecommendation(d))}</td></tr>`;
+  }).join("");
+
+  $("ppStaysList").innerHTML = PP_STAYS.map(([a, b]) =>
+    `<tr><td>${escHtml(a)}</td><td>${escHtml(b)}</td></tr>`).join("");
+  flashBox("ppResult");
+}
+
+// ---- the work ----
+
+async function ppAnalyseRun() {
+  const btn = $("ppAnalyseBtn");
+  btn.disabled = true;
+  try {
+    const ticked = ppProfiles.filter(p => ppSel.has(p.id));
+    if (!ticked.length) throw new Error("Tick at least two profiles, or press select all.");
+    const skipUnused = $("ppSkipUnused").checked;
+    const skipped = skipUnused ? ticked.filter(p => !p.users) : [];
+    const chosen = skipUnused ? ticked.filter(p => p.users) : ticked;
+    if (chosen.length < 2) throw new Error(
+      "Two or more profiles are needed to find anything in common." +
+      (skipped.length ? " The ones you ticked have no users, so untick \u201cleave out profiles with no users\u201d to plan for them anyway." : ""));
+
+    const baselinePct = Math.min(100, Math.max(50, Number($("ppBaseline").value) || 90));
+    const similarPct = Math.min(100, Math.max(50, Number($("ppSimilar").value) || 90));
+    const { tokens, flsRows, flsCapped } = await ppFingerprints(chosen);
+    ppPlan = { ...ppAnalyse(chosen, tokens, baselinePct, similarPct),
+      baselinePct, similarPct, skipped, fls: $("ppFls").checked, flsRows, flsCapped };
+    renderPlan();
+    setStatus(`Plan ready: ${ppPlan.sets.length} permission sets for ${chosen.length} profiles. Nothing in the org was changed.`, "ok");
+  } catch (err) {
+    setProgress(null);
+    setStatus(`Analysis failed: ${err.message}`, "err");
+  } finally { btn.disabled = false; }
+}
+
+// ---- output: metadata an ordinary deployment can take ----
+
+function tokensToPermSetXml(name, tokens) {
+  const objs = new Map(), fls = [], sys = [], tabs = [], apex = [], pages = [], cperms = [];
+  for (const t of [...tokens].sort()) {
+    const cut = t.indexOf(":");
+    const kind = t.slice(0, cut), body = t.slice(cut + 1);
+    const at = body.lastIndexOf(":");
+    if (kind === "obj") objs.set(body.slice(0, at), new Set(body.slice(at + 1).split(",")));
+    else if (kind === "fls") fls.push({ field: body.slice(0, at), flags: body.slice(at + 1) });
+    else if (kind === "tab") tabs.push({ tab: body.slice(0, at), vis: TAB_TO_META[body.slice(at + 1)] || "Available" });
+    else if (kind === "sys") sys.push(body);
+    else if (kind === "apex") apex.push(body);
+    else if (kind === "page") pages.push(body);
+    else if (kind === "cperm") cperms.push(body);
+  }
+  const b = (v) => v ? "true" : "false";
+  const x = [`<?xml version="1.0" encoding="UTF-8"?>`,
+    `<PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">`,
+    `    <label>${escXml(name.replace(/_/g, " ").slice(0, 80))}</label>`,
+    `    <description>${escXml("Proposed by Org Lens from existing profiles. Review before deploying.")}</description>`,
+    `    <hasActivationRequired>false</hasActivationRequired>`];
+  for (const [obj, f] of [...objs.entries()].sort()) {
+    x.push(`    <objectPermissions>`,
+      `        <object>${escXml(obj)}</object>`,
+      `        <allowRead>${b(f.has("R"))}</allowRead>`,
+      `        <allowCreate>${b(f.has("C"))}</allowCreate>`,
+      `        <allowEdit>${b(f.has("U"))}</allowEdit>`,
+      `        <allowDelete>${b(f.has("D"))}</allowDelete>`,
+      `        <viewAllRecords>${b(f.has("VA"))}</viewAllRecords>`,
+      `        <modifyAllRecords>${b(f.has("MA"))}</modifyAllRecords>`,
+      `    </objectPermissions>`);
+  }
+  for (const f of fls) {
+    x.push(`    <fieldPermissions>`,
+      `        <field>${escXml(f.field)}</field>`,
+      `        <readable>${b(f.flags.includes("R"))}</readable>`,
+      `        <editable>${b(f.flags.includes("E"))}</editable>`,
+      `    </fieldPermissions>`);
+  }
+  for (const s of sys.sort()) {
+    x.push(`    <userPermissions>`, `        <enabled>true</enabled>`,
+      `        <name>${escXml(s)}</name>`, `    </userPermissions>`);
+  }
+  for (const t of tabs) {
+    x.push(`    <tabSettings>`, `        <tab>${escXml(t.tab)}</tab>`,
+      `        <visibility>${escXml(t.vis)}</visibility>`, `    </tabSettings>`);
+  }
+  for (const c of apex.sort()) {
+    x.push(`    <classAccesses>`, `        <apexClass>${escXml(c)}</apexClass>`,
+      `        <enabled>true</enabled>`, `    </classAccesses>`);
+  }
+  for (const p of pages.sort()) {
+    x.push(`    <pageAccesses>`, `        <apexPage>${escXml(p)}</apexPage>`,
+      `        <enabled>true</enabled>`, `    </pageAccesses>`);
+  }
+  for (const c of cperms.sort()) {
+    x.push(`    <customPermissions>`, `        <enabled>true</enabled>`,
+      `        <name>${escXml(c)}</name>`, `    </customPermissions>`);
+  }
+  x.push(`</PermissionSet>`, ``);
+  return x.join("\n");
+}
+
+function ppDownloadPackage() {
+  const btn = $("ppPackageBtn");
+  btn.disabled = true;
+  try {
+    if (!ppPlan) throw new Error("Press Analyse first, then the package can be built.");
+    const files = ppPlan.sets.map(s => ({
+      name: `permissionsets/${s.name}.permissionset-meta.xml`,
+      data: tokensToPermSetXml(s.name, s.tokens),
+    }));
+    const members = ppPlan.sets.map(s => `        <members>${escXml(s.name)}</members>`).join("\n");
+    files.push({ name: "package.xml", data:
+      `<?xml version="1.0" encoding="UTF-8"?>\n<Package xmlns="http://soap.sforce.com/2006/04/metadata">\n` +
+      `    <types>\n${members}\n        <name>PermissionSet</name>\n    </types>\n` +
+      `    <version>${MD_API_VERSION}</version>\n</Package>\n` });
+    // a bare zip of XML with no context is a support question waiting to happen
+    files.push({ name: "README.txt", data:
+      [`Permission sets proposed by Org Lens for ${hostOf(auth)} on ${today()}.`, ``,
+       `NOTHING HERE HAS BEEN DEPLOYED, and no profile was changed. To deploy:`,
+       `  sf project deploy start --metadata-dir . --target-org <alias>`,
+       `or drop the permissionsets folder into a project in VS Code and deploy it from there.`, ``,
+       `Baseline_Access holds what at least ${ppPlan.baselinePct}% of the selected profiles already grant, and it is`,
+       `assigned only to the ${ppPlan.onBaseline} of ${ppPlan.profiles.length} that already grant all of it.`,
+       `Persona sets hold what a group of near-identical profiles have in common.`,
+       `Delta sets hold what one profile still needs on its own.`,
+       ppPlan.fls ? `Field level security is included.`
+                  : `Field level security is NOT included: rerun with that option on if you need it.`,
+       ``,
+       `These stay on the profile and are not in this package:`,
+       ...PP_STAYS.map(([a, b]) => `  - ${a}: ${b}`), ``,
+       `Suggested order: deploy the sets, assign them, verify access with the affected users,`,
+       `and only then start taking permissions off the profiles.`,
+      ].join("\n") });
+    const blob = zipStore(files);
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `permission-plan-${hostOf(auth)}-${today()}.zip`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    setStatus(`Package written: ${ppPlan.sets.length} permission sets and package.xml. Nothing was deployed.`, "ok");
+  } catch (err) { setStatus(`Package failed: ${err.message}`, "err"); }
+  finally { btn.disabled = false; }
+}
+
+function ppExportPlan() {
+  const btn = $("ppExportBtn");
+  btn.disabled = true;
+  try {
+    if (!ppPlan) throw new Error("Press Analyse first, then the plan can be exported.");
+    const wb = XLSX.utils.book_new();
+    sheetFromRows(wb, [["Profile", "Users", "Permissions today", "Gets", "Own permissions left", "Reproduced exactly", "Recommendation"],
+      ...ppPlan.profiles.map(d => [d.profile.name, d.profile.users, d.total,
+        [d.base ? "Baseline_Access" : null, d.group?.name,
+          d.tokens.size ? `${d.profile.name} delta` : null].filter(Boolean).join(" + "),
+        d.tokens.size, d.ok ? "yes" : "no", ppRecommendation(d)])],
+      "Profiles", 45);
+    sheetFromRows(wb, [["Permission set", "Kind", "Permissions", "Covers"],
+      ...ppPlan.sets.map(s => [s.name, s.kind, s.tokens.size,
+        s.members.map(m => m.name).join(", ")])],
+      "Proposed sets", 50);
+    sheetFromRows(wb, [["Permission set", "Permission"],
+      ...ppPlan.sets.flatMap(s => [...s.tokens].sort().map(t => [s.name, t]))], "Set contents", 60);
+    if (ppPlan.skipped.length) sheetFromRows(wb, [["Profile", "Note"],
+      ...ppPlan.skipped.map(p => [p.name, "No users of any type: delete rather than convert"])], "Unused profiles", 45);
+    sheetFromRows(wb, [["Setting", "Why it stays on the profile"], ...PP_STAYS], "Stays on profile", 60);
+    sheetFromRows(wb, [["Property", "Value"],
+      ["Org", hostOf(auth)], ["Profiles planned", ppPlan.profiles.length],
+      ["Permission sets proposed", ppPlan.sets.length],
+      ["Baseline threshold", `${ppPlan.baselinePct}% of profiles`],
+      ["Profiles on the baseline", `${ppPlan.onBaseline} of ${ppPlan.profiles.length}`],
+      ["Similarity threshold", `${ppPlan.similarPct}%`],
+      ["Field level security included", ppPlan.fls ? `yes, ${ppPlan.flsRows} rows${ppPlan.flsCapped ? " (capped)" : ""}` : "no"],
+      ["Reproduced exactly", `${ppPlan.exact} of ${ppPlan.profiles.length}`],
+      ["Produced", today()],
+      ["Note", "A plan, not a migration. Nothing was written to the org."]], "About");
+    XLSX.writeFile(wb, `permission-plan-${hostOf(auth)}-${today()}.xlsx`);
+    setStatus("Plan exported.", "ok");
+  } catch (err) { setStatus(`Export failed: ${err.message}`, "err"); }
+  finally { btn.disabled = false; }
+}
 
 // ---------- security posture ----------
 // The four permissions that let someone step around everything else. Each is held either
@@ -5962,6 +6462,7 @@ const PANEL_HINTS = {
   panelJobs: "Scheduled jobs and recent failures appear here.",
   panelPackage: "Pick a date, then the changed components appear here with a package.xml.",
   panelCompare: "Connect a second org, then a per-type difference summary appears here.",
+  panelPermPlan: "Tick profiles, then the permission sets that would replace them appear here.",
   panelPerms: "Tick objects, then object CRUD per profile and permission set appears here.",
   panelProfCmp: "Choose two profiles or permission sets, then their differences appear here.",
   panelUserAccess: "Search a user, then their effective access appears here with its source.",
@@ -7139,6 +7640,25 @@ $("shExportBtn").addEventListener("click", sharingExport);
 $("shFilter").addEventListener("input", () => { if (shOwd.length) renderOwdList(); });
 $("shFilter").addEventListener("search", () => { if (shOwd.length) renderOwdList(); });
 $("shOpenOnly").addEventListener("change", () => { if (shOwd.length) renderOwdList(); });
+$("ppAnalyseBtn").addEventListener("click", ppAnalyseRun);
+$("ppPackageBtn").addEventListener("click", ppDownloadPackage);
+$("ppExportBtn").addEventListener("click", ppExportPlan);
+$("ppSearch").addEventListener("input", renderPpList);
+$("ppSearch").addEventListener("search", renderPpList);
+$("ppList").addEventListener("change", (e) => {
+  const id = e.target?.dataset?.pp;
+  if (!id) return;
+  e.target.checked ? ppSel.add(id) : ppSel.delete(id);
+  ppSetCount();
+});
+$("ppAll").addEventListener("click", () => { ppProfiles.forEach(p => ppSel.add(p.id)); renderPpList(); });
+$("ppClear").addEventListener("click", () => { ppSel.clear(); renderPpList(); });
+$("ppUsed").addEventListener("click", () => {
+  ppSel.clear();
+  ppProfiles.filter(p => p.users).forEach(p => ppSel.add(p.id));
+  renderPpList();
+  setStatus(`${ppSel.size} profile${ppSel.size === 1 ? "" : "s"} with users selected.`, "ok");
+});
 $("secShowBtn").addEventListener("click", securityShow);
 $("secExportBtn").addEventListener("click", securityExport);
 $("secFilter").addEventListener("input", renderSecList);

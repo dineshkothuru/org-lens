@@ -107,6 +107,12 @@ extension's card in `chrome://extensions`.
   and whether it came from a profile, a permission set or a permission set group, plus the
   containers nobody uses
 - **Permissions matrix** — object CRUD and field-level security across profiles
+- **Permission plan** — what a profile-to-permission-set migration should actually look
+  like: the permissions nearly every profile grants (one shared set), the profiles that are
+  effectively the same (one set between them), and what is genuinely left per profile. Every
+  proposal is checked by recomposing it and comparing to the profile it replaces, so nothing
+  is lost and nothing is gained. Downloads as a plan and as `permissionset-meta.xml` plus a
+  `package.xml` for your own pipeline; it never writes to the org
 - **Org compare** — two orgs as a detailed diff, or three to eight as a matrix
 - **Automation** — everything that fires on an object, in evaluation order
 - **Where is it used?** — what references a field, object, class, flow, label or component,
@@ -167,6 +173,7 @@ figures are per run, against your org's daily request allowance.
 | Code search | one query per source type, but the payloads are large: it downloads source to grep it |
 | Record counts | one aggregate per object |
 | **Field usage and unused fields** | **one aggregate per field** — the heaviest panel here, so keep the object selection small |
+| Permission plan | a few calls per hundred profiles, plus one describe. With field-level security ticked it reads every field permission on every selected profile, which is thousands of rows |
 | Export all metadata | around 50 to 70 Metadata API calls, more on an org with many report folders |
 | Documentation pack | the sum of the sections you tick |
 
