@@ -1,4 +1,4 @@
-const APP_VERSION = "v2.08 · 2026-08-23";
+const APP_VERSION = "v2.09 · 2026-08-23";
 const API_VERSION = "v61.0";
 const SKIP_SUFFIXES = ["Share", "History", "Feed", "ChangeEvent", "Tag"];
 const CONCURRENCY = 8;
@@ -2504,6 +2504,7 @@ function toggleLimits() {
 function baseUrl(target) {
   if (!target) return auth ? auth.instanceUrl : "";
   if (typeof target === "object") return target.instanceUrl || "";        // a session
+  if (/^https?:\/\//i.test(target)) return new URL(target).origin;       // already a URL
   const known = sessionByHost.get(target);                               // a host we hold a session for
   if (known?.instanceUrl) return known.instanceUrl;
   if (auth && apiHostOf(auth) === target) return auth.instanceUrl;
@@ -6620,8 +6621,8 @@ async function collectProfCmp() {
     const linkFor = (side, sideAuth, id) => {
       const pid = $("prof" + side).selectedOptions[0]?.dataset?.pid;
       return kind === "profile"
-        ? (pid ? setupUrl.profile(pid, sideAuth.instanceUrl) : "")
-        : setupUrl.permSet(id, sideAuth.instanceUrl);
+        ? (pid ? setupUrl.profile(pid, sideAuth) : "")
+        : setupUrl.permSet(id, sideAuth);
     };
     const urlA = linkFor("A", aAuth, idA), urlB = linkFor("B", bAuth, idB);
 
