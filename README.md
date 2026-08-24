@@ -11,6 +11,9 @@ so there is nothing to configure or install on the Salesforce side.
 **Read-only.** Every panel queries; nothing writes back. Nothing is stored, sent or logged
 anywhere — see [Security](#security).
 
+Created out of personal interest, to have these in one place. Try it at your own
+discretion.
+
 Built by Dinesh Kothuru.
 
 ---
